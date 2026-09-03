@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+hook_repo_root="$(git rev-parse --show-toplevel)"
+cd "${hook_repo_root}"
+
+exec pnpm gate
