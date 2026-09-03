@@ -2,8 +2,8 @@
 
 | 属性 | 内容 |
 |---|---|
-| 文档状态 | Draft / Proposed |
-| 版本 | v0.3 |
+| 文档状态 | Active / Evolving |
+| 版本 | v0.4 |
 | 更新日期 | 2026-09-04 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
@@ -45,14 +45,15 @@
 | 前端 | React 19 + TypeScript strict | 已采用 | 当前项目已初始化。 |
 | 构建 | Vite 7 | 已采用 | 当前项目已初始化。 |
 | 包管理 | pnpm 11.10.0 | 已采用 | 由 `packageManager` 固定版本。 |
-| Rust | Rust 2021 edition | 已采用 | 当前 Cargo 工程配置。 |
-| 本地数据库 | SQLite | 拟采用 | 满足单机、事务、备份和迁移需求。 |
-| SQLite 访问 | SQLx SQLite | 待 ADR | 推荐异步访问与内嵌迁移，不允许前端直连数据库。 |
-| 前端异步数据 | TanStack Query | 拟采用 | 管理 Tauri 查询缓存、失效和写后刷新。 |
-| 前端 UI 状态 | React local state | 拟采用 | MVP 暂不引入全局状态库；出现跨页面状态后再评估 Zustand。 |
-| 表单校验 | React Hook Form + Zod | 拟采用 | 前端即时反馈；Rust 后端仍需重复校验。 |
+| Rust | Rust 2024 edition | 已采用 | 当前 Cargo 工程配置。 |
+| 本地数据库 | SQLite | 已采用 | 数据文件位于 macOS 应用数据目录。 |
+| SQLite 访问 | SQLx 0.9 SQLite | 已采用 | 异步访问与内嵌迁移，见 [ADR-001](adr/0001-sqlx-sqlite.md)。 |
+| 前端异步数据 | TanStack Query 5 | 已采用 | 管理 Tauri 查询缓存、失效和写后刷新。 |
+| 前端 UI 状态 | React local state | 已采用 | MVP 暂不引入全局状态库；出现跨页面状态后再评估 Zustand。 |
+| 表单校验 | React Hook Form + Zod | 已采用 | 前端即时反馈；Rust 后端仍重复校验。 |
+| UI 基础 | Tailwind CSS 4 + shadcn Base UI | 已采用 | 使用系统主题和本地组件源码，见 [ADR-003](adr/0003-shadcn-base-ui.md)。 |
 | Excel 处理 | Rust 侧解析与生成 | 待 ADR | 解析、字段匹配和正式写入均留在可信后端。 |
-| IPC 类型共享 | Rust DTO 生成 TypeScript 类型 | 待 ADR | 如生成方案不成熟，先使用契约测试防止漂移。 |
+| IPC 类型共享 | tauri-specta 生成 TypeScript bindings | 已采用 | RC 版本精确锁定并由门禁检查漂移，见 [ADR-002](adr/0002-tauri-specta-bindings.md)。 |
 
 任何“拟采用”或“待 ADR”条目都不代表依赖已经安装。
 
@@ -529,11 +530,11 @@ pnpm tauri build --bundles dmg
 
 ## 14. 实施顺序
 
-1. 建立目标目录、错误类型和 Tauri client 边界。
-2. 决定 SQLite 访问库，加入数据库初始化和内嵌迁移。
-3. 实现机房、区域、机柜和设备实体及 CRUD。
-4. 实现放置领域规则、数据库约束和移动事务。
-5. 实现机柜画布与设备详情交互。
+1. 已建立目标目录、错误类型和类型化 Tauri client 边界。
+2. 已采用 SQLx，加入应用数据目录数据库初始化和内嵌迁移。
+3. 已实现机房、区域、机柜和设备的创建与查看主链路；编辑和归档留待 Slice 2。
+4. 已实现首次上架领域规则和数据库约束；移动、下架事务留待 Slice 2。
+5. 已实现多机柜画布与设备详情交互；缩放和虚拟化留待 Slice 2。
 6. 实现导入 staging、差异预览、确认应用和导出。
 7. 实现审计、备份、恢复和迁移兼容测试。
 8. 配置质量门禁、macOS 签名、公证和安装验证。
@@ -542,22 +543,18 @@ pnpm tauri build --bundles dmg
 
 | ADR | 决策问题 | 候选方案 | 完成阶段 |
 |---|---|---|---|
-| ADR-001 | SQLite 访问方式 | SQLx / rusqlite | M1 开始前 |
-| ADR-002 | Rust 与 TypeScript DTO 同步 | 自动生成 / 手工类型 + 契约测试 | M1 开始前 |
 | ADR-003 | 一致性备份实现 | SQLite Backup API / `VACUUM INTO` | M4 开始前 |
 | ADR-004 | Excel 解析和生成库 | Rust 生态候选库实测比较 | M3 开始前 |
 | ADR-005 | macOS 架构产物 | 双架构独立 DMG / Universal Binary | 发布前 |
 
 ## 16. 当前脚手架差距
 
-以下内容尚未实现：
+Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目录、最小权限、前端 lint/测试和 Rust 测试。后续差距包括：
 
-- 仍是 Tauri 默认示例页面和 `greet` Command。
-- SQLite、迁移、应用服务和领域层尚未建立。
-- `src` 尚未按 app/features/shared 分层。
-- CSP 尚未配置，默认 opener capability 尚未收紧。
-- lint、单元测试、集成测试和 CI 尚未配置。
-- Cargo 描述和作者仍为脚手架占位值。
+- 编辑、归档、移动、下架、审计和历史查询尚未实现。
+- 画布缩放、可视区域虚拟化及 100 台机柜性能验证尚未实现。
+- Excel、导出、备份和恢复适配器尚未实现。
+- 远程 CI、签名、公证和安装包发布门禁尚未建立。
 
 ## 17. 参考资料
 
@@ -577,3 +574,4 @@ pnpm tauri build --bundles dmg
 | v0.1 | 2026-09-04 | 建立 MVP 技术架构、数据模型、关键流程、安全与交付基线。 |
 | v0.2 | 2026-09-04 | 建立与用户故事文档的双向关联。 |
 | v0.3 | 2026-09-04 | 接入 worktree、提交门禁和 squash 合并开发规范。 |
+| v0.4 | 2026-09-04 | 记录 Iteration 001 已采用的 SQLx、tauri-specta、前端 UI/状态方案及当前实现差距。 |

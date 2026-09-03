@@ -1,0 +1,123 @@
+.rack-stage {
+  --rack-line: color-mix(in oklch, var(--foreground) 54%, transparent);
+  --rack-line-soft: color-mix(in oklch, var(--foreground) 24%, transparent);
+  --rack-panel: color-mix(in oklch, var(--foreground) 14%, var(--background));
+  background-color: color-mix(in oklch, var(--background) 97%, var(--foreground));
+}
+
+.rack-frame {
+  width: 254px;
+  color: var(--foreground);
+}
+
+.rack-cap {
+  position: relative;
+  height: 30px;
+  margin-left: 34px;
+  border: 1px solid var(--rack-line);
+}
+
+.rack-cap::before,
+.rack-cap::after {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  content: "";
+  border: 1px solid var(--rack-line);
+  border-radius: 999px;
+  transform: translateY(-50%);
+}
+
+.rack-cap::before { left: 6px; }
+.rack-cap::after { right: 6px; }
+
+.rack-body {
+  position: relative;
+  margin-left: 34px;
+  border-right: 1px solid var(--rack-line);
+  border-left: 1px solid var(--rack-line);
+}
+
+.rack-grid {
+  position: absolute;
+  inset: 0 10px;
+  border-right: 1px solid var(--rack-line-soft);
+  border-left: 1px solid var(--rack-line-soft);
+  background-image: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent 12px,
+    var(--rack-line-soft) 12px,
+    var(--rack-line-soft) 13px
+  );
+}
+
+.rack-unit-label {
+  position: absolute;
+  left: -33px;
+  width: 24px;
+  height: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  line-height: 13px;
+  text-align: right;
+  color: color-mix(in oklch, var(--foreground) 62%, transparent);
+}
+
+.rack-unit-label::after {
+  position: absolute;
+  top: 6px;
+  left: 27px;
+  width: 7px;
+  height: 1px;
+  content: "";
+  background: var(--rack-line-soft);
+}
+
+.rack-device {
+  position: absolute;
+  right: 13px;
+  left: 13px;
+  z-index: 2;
+  display: grid;
+  min-height: 12px;
+  grid-template-columns: 10px minmax(0, 1fr) 10px;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  border: 1px solid var(--rack-line);
+  border-radius: 1px;
+  background: var(--rack-panel);
+  color: var(--foreground);
+  text-align: left;
+}
+
+.rack-device:hover,
+.rack-device[data-selected="true"] {
+  outline: 1px solid var(--foreground);
+  outline-offset: 1px;
+}
+
+.rack-device-handle {
+  width: 5px;
+  height: 60%;
+  justify-self: center;
+  border: 1px solid var(--rack-line);
+  border-radius: 1px;
+}
+
+.rack-device-label {
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rack-foot {
+  height: 30px;
+  margin-left: 34px;
+  border: 1px solid var(--rack-line);
+}

@@ -7,8 +7,11 @@ UFrame 是一个面向 macOS 的本地桌面机柜与物理设备资产管理工
 - Tauri 2
 - React 19 + TypeScript
 - Vite 7
+- Tailwind CSS 4 + shadcn Base UI
+- React Router 7 + TanStack Query 5
+- SQLx 0.9 + SQLite
+- tauri-specta 类型安全 IPC
 - pnpm
-- SQLite（计划接入）
 
 ## 本地开发
 
@@ -18,10 +21,19 @@ pnpm hooks:install
 pnpm tauri dev
 ```
 
-仅构建前端：
+Debug 模式可通过侧栏底部的“加载开发数据”创建一组幂等样例数据；Release 构建不包含该入口与命令。
+
+提交前运行完整门禁：
 
 ```bash
-pnpm build
+pnpm gate
+```
+
+只生成或校验 IPC bindings：
+
+```bash
+pnpm bindings:generate
+pnpm bindings:check
 ```
 
 ## 文档
@@ -30,5 +42,6 @@ pnpm build
 - [用户故事](docs/USER_STORIES.md)
 - [技术设计文档](docs/TECHNICAL_DESIGN.md)
 - [开发规范](docs/DEVELOPMENT_GUIDE.md)
+- [Iteration 001 验收记录](docs/iterations/0001-walking-skeleton.md)
 
-当前项目处于需求与架构设计阶段，尚未实现业务功能。
+Iteration 001 已打通“创建位置 → 创建机柜 → 创建设备 → 设备上架 → 多机柜画布展示”的最小闭环。
