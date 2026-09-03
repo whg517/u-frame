@@ -4,7 +4,6 @@ import { Link, useSearchParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/shared/components/empty-state"
-import { PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
@@ -41,31 +40,63 @@ export function RackCanvasPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader
-        eyebrow="Rack canvas"
-        title="机柜一览"
-        description="正面 U 位视图 · 顶部为最大 U，底部为 U1"
-        actions={
-          <>
-            <label className="sr-only" htmlFor="area-filter">区域</label>
-            <select id="area-filter" value={areaId ?? ""} onChange={(event) => updateArea(event.target.value)} className="h-8 min-w-44 rounded-lg border border-input bg-transparent px-2.5 text-sm">
-              <option value="">全部区域</option>
-              {areas.map((area) => <option key={area.id} value={area.id}>{area.roomName} / {area.name}</option>)}
-            </select>
-            <Button variant="outline" nativeButton={false} render={<Link to="/racks/new" />}><Plus /> 新建机柜</Button>
-          </>
-        }
-      />
-      <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1 overflow-auto">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-6 border-b px-5 lg:px-6">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 text-lg font-semibold tracking-tight">机柜一览</h1>
+          <p className="hidden truncate text-xs text-muted-foreground lg:block">
+            正面 U 位 · 顶部为最大 U，底部为 U1
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <label className="sr-only" htmlFor="area-filter">
+            区域
+          </label>
+          <select
+            id="area-filter"
+            value={areaId ?? ""}
+            onChange={(event) => updateArea(event.target.value)}
+            className="h-8 min-w-40 rounded-md border border-input bg-background px-2.5 text-sm"
+          >
+            <option value="">全部区域</option>
+            {areas.map((area) => (
+              <option key={area.id} value={area.id}>
+                {area.roomName} / {area.name}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={<Link to="/racks/new" />}
+          >
+            <Plus /> 新建机柜
+          </Button>
+        </div>
+      </header>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-auto bg-muted/10">
           {view.isPending ? (
-            <p className="p-8 text-sm text-muted-foreground">正在绘制机柜…</p>
+            <div className="grid size-full place-items-center">
+              <p className="text-sm text-muted-foreground">正在绘制机柜…</p>
+            </div>
           ) : view.isError ? (
-            <p className="p-8 text-sm text-destructive">{errorMessage(view.error)}</p>
+            <div className="grid size-full place-items-center px-6 text-center">
+              <p className="text-sm text-destructive">{errorMessage(view.error)}</p>
+            </div>
           ) : view.data.racks.length === 0 ? (
-            <div className="p-8">
-              <EmptyState title="当前范围没有机柜" description="创建位置和机柜后，会在这里显示正面 U 位图。" action={<Button nativeButton={false} render={<Link to="/racks/new" />}><Plus /> 创建机柜</Button>} />
+            <div className="grid size-full min-h-80 place-items-center">
+              <EmptyState
+                variant="canvas"
+                title="当前范围没有机柜"
+                description="创建位置和机柜后，会在这里显示正面 U 位图。"
+                action={
+                  <Button nativeButton={false} render={<Link to="/racks/new" />}>
+                    <Plus /> 创建机柜
+                  </Button>
+                }
+              />
             </div>
           ) : (
             <RackCanvas

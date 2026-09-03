@@ -46,11 +46,11 @@ export function AppLayout() {
   })
 
   return (
-    <SidebarProvider defaultOpen>
-      <Sidebar collapsible="none" className="border-r">
-        <SidebarHeader className="border-b px-5 py-5">
+    <SidebarProvider defaultOpen className="h-dvh min-h-0 overflow-hidden">
+      <Sidebar collapsible="none" className="h-dvh min-h-0 shrink-0 border-r">
+        <SidebarHeader className="border-b px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="grid size-9 place-items-center rounded-lg bg-foreground text-sm font-semibold text-background">
+            <div className="grid size-8 place-items-center rounded-md bg-foreground text-xs font-semibold text-background">
               UF
             </div>
             <div>
@@ -59,7 +59,7 @@ export function AppLayout() {
             </div>
           </div>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="py-2">
           <SidebarGroup>
             <SidebarGroupLabel>工作区</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -81,7 +81,7 @@ export function AppLayout() {
           </SidebarGroup>
         </SidebarContent>
         {import.meta.env.DEV ? (
-          <SidebarFooter className="border-t p-4">
+          <SidebarFooter className="mt-auto border-t p-3">
             <Button
               variant="outline"
               size="sm"
@@ -103,7 +103,7 @@ export function AppLayout() {
           </SidebarFooter>
         ) : null}
       </Sidebar>
-      <SidebarInset className="min-w-0 bg-background">
+      <SidebarInset className="h-dvh min-h-0 min-w-0 overflow-hidden bg-background">
         <div className="flex h-12 shrink-0 items-center border-b px-4 md:hidden">
           <SidebarTrigger aria-label="打开导航">
             <PanelLeft />

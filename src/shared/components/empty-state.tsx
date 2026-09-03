@@ -1,16 +1,27 @@
 import type { ReactNode } from "react"
 
+import { cn } from "@/lib/utils"
+
 export function EmptyState({
   title,
   description,
   action,
+  variant = "panel",
 }: {
   title: string
   description: string
   action?: ReactNode
+  variant?: "panel" | "canvas"
 }) {
   return (
-    <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 text-center">
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center px-6 text-center",
+        variant === "panel"
+          ? "min-h-64 rounded-xl border border-dashed bg-muted/20"
+          : "min-h-0",
+      )}
+    >
       <div className="mb-4 flex size-10 items-center justify-center rounded-full border bg-background text-lg">
         U
       </div>

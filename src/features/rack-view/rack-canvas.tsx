@@ -14,7 +14,10 @@ export function RackCanvas({
   onSelectAsset: (asset: RackPlacementViewDto) => void
 }) {
   return (
-    <div className="rack-stage min-h-full min-w-max p-8 lg:p-10" aria-label="机柜画布">
+    <div
+      className="rack-stage flex min-h-full min-w-max items-center p-6 lg:p-8"
+      aria-label="机柜画布"
+    >
       <div className="flex items-end gap-12">
         {racks.map(({ rack, placements }) => (
           <section className="rack-frame" key={rack.id} aria-label={`${rack.code}，${rack.totalU}U`}>
