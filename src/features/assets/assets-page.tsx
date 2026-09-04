@@ -1,4 +1,4 @@
-import { ArrowUpToLine, Plus } from "lucide-react"
+import { ArrowUpToLine, Eye, Plus } from "lucide-react"
 import { Link } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
@@ -7,8 +7,8 @@ import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
+import { assetStatusLabels, assetTypeLabels } from "@/shared/lib/asset-labels"
 import { errorMessage } from "@/shared/lib/errors"
-import { assetStatusLabels, assetTypeLabels } from "./asset-labels"
 import { useAssets } from "./queries"
 
 export function AssetsPage() {
@@ -55,11 +55,16 @@ export function AssetsPage() {
                       {asset.placement ? `${asset.placement.rackCode} · U${asset.placement.startU}–U${asset.placement.endU}` : <span className="text-muted-foreground">未上架</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      {!asset.placement ? (
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="ghost" nativeButton={false} render={<Link to={`/assets/${asset.id}`} />}>
+                          <Eye /> 查看
+                        </Button>
+                        {!asset.placement ? (
                         <Button size="sm" variant="outline" nativeButton={false} render={<Link to={`/assets/${asset.id}/place`} />}>
                           <ArrowUpToLine /> 上架
                         </Button>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

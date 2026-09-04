@@ -1,4 +1,4 @@
-import { MapPin, Plus } from "lucide-react"
+import { ChevronRight, Eye, MapPin, Plus } from "lucide-react"
 import { Link } from "react-router"
 
 import { Button } from "@/components/ui/button"
@@ -48,14 +48,19 @@ export function LocationsPage() {
             {locations.data.rooms.map(({ room, areas }) => (
               <Card key={room.id}>
                 <CardHeader className="border-b">
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-9 place-items-center rounded-lg bg-muted">
-                      <MapPin className="size-4" />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid size-9 place-items-center rounded-lg bg-muted">
+                        <MapPin className="size-4" />
+                      </div>
+                      <div>
+                        <CardTitle>{room.name}</CardTitle>
+                        <p className="mt-1 font-mono text-xs text-muted-foreground">{room.code}</p>
+                      </div>
                     </div>
-                    <div>
-                      <CardTitle>{room.name}</CardTitle>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">{room.code}</p>
-                    </div>
+                    <Button size="sm" variant="ghost" nativeButton={false} render={<Link to={`/locations/rooms/${room.id}`} />}>
+                      <Eye /> 查看
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -64,9 +69,17 @@ export function LocationsPage() {
                   ) : (
                     <ul className="divide-y">
                       {areas.map((area) => (
-                        <li key={area.id} className="flex items-center justify-between px-5 py-3">
-                          <span className="text-sm font-medium">{area.name}</span>
-                          <span className="font-mono text-xs text-muted-foreground">{area.code}</span>
+                        <li key={area.id}>
+                          <Link
+                            className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-muted/50"
+                            to={`/locations/areas/${area.id}`}
+                          >
+                            <span className="text-sm font-medium">{area.name}</span>
+                            <span className="flex items-center gap-3">
+                              <span className="font-mono text-xs text-muted-foreground">{area.code}</span>
+                              <ChevronRight className="size-4 text-muted-foreground" />
+                            </span>
+                          </Link>
                         </li>
                       ))}
                     </ul>

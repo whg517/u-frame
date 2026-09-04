@@ -1,9 +1,10 @@
-import { X } from "lucide-react"
+import { ExternalLink, X } from "lucide-react"
+import { Link } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { assetStatusLabels, assetTypeLabels } from "@/shared/lib/asset-labels"
 import type { RackDto, RackPlacementViewDto } from "@/shared/lib/tauri-client/bindings"
-import { assetStatusLabels, assetTypeLabels } from "@/features/assets/asset-labels"
 
 export function DeviceInspector({
   placement,
@@ -44,6 +45,14 @@ export function DeviceInspector({
           </div>
         ))}
       </dl>
+      <Button
+        className="mt-5 w-full"
+        variant="outline"
+        nativeButton={false}
+        render={<Link to={`/assets/${placement.assetId}`} />}
+      >
+        查看完整详情 <ExternalLink />
+      </Button>
     </aside>
   )
 }

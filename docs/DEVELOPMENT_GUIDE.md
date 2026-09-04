@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.1 |
+| 版本 | v1.2 |
 | 更新日期 | 2026-09-04 |
 | 适用范围 | UFrame 全部代码、文档和配置变更 |
 | 关联文档 | [项目协作指南](../AGENTS.md) · [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [技术设计](TECHNICAL_DESIGN.md) |
@@ -153,13 +153,13 @@ pnpm gate
 | Git 空白错误 | `git diff --check`、`git diff --cached --check` | 已建立 |
 | Shell 语法 | `bash -n scripts/gate.sh .githooks/pre-commit` | 已建立 |
 | 文档一致性 | `pnpm docs:check` | 已建立 |
-| 前端 lint | `pnpm run --if-present lint` | 尚未配置，配置后自动纳入 |
-| 前端测试 | `pnpm run --if-present test` | 尚未配置，配置后自动纳入 |
+| 前端 lint | `pnpm lint` | 已建立 |
+| 前端测试 | `pnpm test` | 已建立 |
 | 前端类型与构建 | `pnpm build` | 已建立 |
 | Rust 格式 | `cargo fmt --check` | 已建立 |
 | Rust 编译 | `cargo check` | 已建立 |
 | Rust lint | `cargo clippy -- -D warnings` | 已建立 |
-| Rust 测试 | `cargo test` | 已建立，当前测试数为 0 |
+| Rust 测试 | `cargo test` | 已建立 |
 
 前端业务实现开始前，必须建立非 watch 模式的 `lint` 和 `test` scripts。加入这些 scripts 的同一变更必须确保 `pnpm gate` 会真实执行它们。
 
@@ -313,3 +313,4 @@ pnpm tauri build --bundles dmg
 |---|---|---|
 | v1.0 | 2026-09-04 | 建立 worktree 开发、强制提交门禁和 squash 合并规范。 |
 | v1.1 | 2026-09-04 | 结束引导例外，记录已启用的完整本地门禁和无远程仓库时的 worktree 基线。 |
+| v1.2 | 2026-09-04 | 修正前端 lint、测试和 Rust 测试已纳入门禁的当前状态。 |

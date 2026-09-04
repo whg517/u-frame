@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react"
+import { Eye, Plus } from "lucide-react"
 import { Link } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
@@ -41,6 +41,7 @@ export function RacksPage() {
                   <TableHead>位置</TableHead>
                   <TableHead>额定功率</TableHead>
                   <TableHead>状态</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -51,6 +52,11 @@ export function RacksPage() {
                     <TableCell>{rack.roomName} / {rack.areaName}</TableCell>
                     <TableCell>{rack.powerCapacityW ? `${rack.powerCapacityW} W` : "—"}</TableCell>
                     <TableCell><Badge variant="outline">活动</Badge></TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" nativeButton={false} render={<Link to={`/racks/${rack.id}`} />}>
+                        <Eye /> 查看
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
