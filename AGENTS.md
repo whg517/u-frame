@@ -27,12 +27,12 @@ MVP 管理四类设备：
 
 ## 2. 当前项目状态
 
-- 项目处于需求与架构设计阶段。
-- 当前代码仍是 `create-tauri-app` 生成的 React/Tauri 示例。
-- Tauri 2、React 19、TypeScript strict、Vite 7 和 pnpm 已实际采用。
-- SQLite、SQLx、TanStack Query、表单库、Excel 库、测试框架和 CI 尚未接入。
-- `src-tauri/src/lib.rs` 中的 `greet` 仍是脚手架示例，不是业务能力。
-- `src-tauri/tauri.conf.json` 当前 `csp` 为 `null`；`opener:default` 仍处于启用状态。这些是已知安全差距，不得描述为已完成加固。
+- Iteration 001 已交付创建位置、机柜、设备、设备上架与多机柜查看的行走骨架。
+- Tauri 2、React 19、TypeScript strict、Vite 7、pnpm、SQLite、SQLx、TanStack Query、React Hook Form、Zod、Vitest 和 ESLint 已实际采用。
+- Tauri IPC bindings 由 tauri-specta 生成并纳入门禁；应用启动时执行内嵌 SQLite migration。
+- 机柜一览已具备网格画布、缩放和机柜顺序持久化；设备拖拽上架、移动及大规模虚拟化仍未实现。
+- CSP 已限制为本地资源与 Tauri IPC，默认 opener 权限已移除。
+- Excel 导入导出、备份恢复、完整审计和 CI 尚未接入。
 
 技术设计中的“拟采用”和“待 ADR”均为方案，不代表已经安装或落地。实现前应检查当前代码和锁文件。
 
@@ -181,7 +181,9 @@ Tauri Command
 - 设备块按 `startU` 和 `heightU` 派生，不保存像素坐标。
 - 空闲和占用必须易于区分，设备边界必须与 U 位刻度对齐。
 - 详情通过选中态或侧栏展示，不在设备正面堆叠大量字段。
-- 上架和移动使用表单，不实现拖拽。
+- 设备上架和移动使用表单，不实现设备拖拽。
+- 机柜标题可以作为拖动手柄调整横向画布顺序；顺序必须写入 SQLite，不能只保存在前端。
+- 画布支持 50%–160% 缩放，背景网格和机柜使用同一缩放比例。
 - 不建立背面、安装面或双面占用模型。
 
 用户可见文案默认使用中文；代码标识符、数据库字段和稳定错误码使用英文。

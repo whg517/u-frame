@@ -23,6 +23,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         commands::create_asset,
         commands::place_asset,
         commands::get_rack_view,
+        commands::reorder_racks,
         commands::seed_dev_data,
     ])
 }
@@ -39,6 +40,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         commands::create_asset,
         commands::place_asset,
         commands::get_rack_view,
+        commands::reorder_racks,
     ])
 }
 

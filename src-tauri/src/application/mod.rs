@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use sqlx::{Row, SqlitePool};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -9,7 +9,8 @@ use crate::{
     dto::{
         AreaDto, AssetDto, AssetPlacementDto, CreateAreaInput, CreateAssetInput, CreateRackInput,
         CreateRoomInput, LocationTreeDto, PlaceAssetInput, PlacementDto, RackCanvasDto, RackDto,
-        RackPlacementViewDto, RackViewDto, RoomDto, RoomNodeDto,
+        RackPlacementViewDto, RackViewDto, ReorderRacksInput, ReorderRacksResultDto, RoomDto,
+        RoomNodeDto,
     },
     error::AppErrorDto,
     infrastructure::repository,
@@ -281,8 +282,14 @@ pub async fn create_rack(
     let rack_id = id();
     let timestamp = now();
     let notes = domain::optional(input.notes);
+    let sort_order: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM racks WHERE status = 'active'",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
     sqlx::query(
-        "INSERT INTO racks (id, area_id, code, specification, total_u, power_capacity_w, status, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)",
+        "INSERT INTO racks (id, area_id, code, specification, total_u, power_capacity_w, status, notes, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)",
     )
     .bind(&rack_id)
     .bind(&area_id)
@@ -293,6 +300,7 @@ pub async fn create_rack(
     .bind(&notes)
     .bind(&timestamp)
     .bind(&timestamp)
+    .bind(sort_order)
     .execute(pool)
     .await
     .map_err(|error| AppErrorDto::database(operation_id, error))?;
@@ -579,6 +587,91 @@ pub async fn get_rack_view(
     Ok(RackViewDto { racks })
 }
 
+pub async fn reorder_racks(
+    pool: &SqlitePool,
+    input: ReorderRacksInput,
+    operation_id: &str,
+) -> Result<ReorderRacksResultDto, AppErrorDto> {
+    if input.rack_ids.is_empty() {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Rack.OrderEmpty",
+            "机柜顺序不能为空",
+            "rackIds",
+        ));
+    }
+    let requested: HashSet<&str> = input.rack_ids.iter().map(String::as_str).collect();
+    if requested.len() != input.rack_ids.len() {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Rack.OrderDuplicate",
+            "机柜顺序中包含重复项",
+            "rackIds",
+        ));
+    }
+
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let current_order = repository::list_active_rack_ids(&mut *transaction)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let active_ids: HashSet<&str> = current_order.iter().map(String::as_str).collect();
+    if input
+        .rack_ids
+        .iter()
+        .any(|rack_id| !active_ids.contains(rack_id.as_str()))
+    {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Rack.OrderUnavailable",
+            "机柜顺序中包含不存在或不可用的机柜",
+            "rackIds",
+        ));
+    }
+
+    let mut requested_order = input.rack_ids.iter();
+    let final_order: Vec<String> = current_order
+        .iter()
+        .map(|rack_id| {
+            if requested.contains(rack_id.as_str()) {
+                requested_order
+                    .next()
+                    .expect("requested rack slots and ids must have equal lengths")
+                    .clone()
+            } else {
+                rack_id.clone()
+            }
+        })
+        .collect();
+    let timestamp = now();
+    for (position, rack_id) in final_order.iter().enumerate() {
+        sqlx::query("UPDATE racks SET sort_order = ? WHERE id = ?")
+            .bind(position as i64)
+            .bind(rack_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    }
+    for rack_id in &input.rack_ids {
+        sqlx::query("UPDATE racks SET updated_at = ? WHERE id = ?")
+            .bind(&timestamp)
+            .bind(rack_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+
+    Ok(ReorderRacksResultDto {
+        rack_ids: input.rack_ids,
+    })
+}
+
 #[cfg(debug_assertions)]
 pub async fn seed_dev_data(
     pool: &SqlitePool,
@@ -629,9 +722,9 @@ pub async fn seed_dev_data(
         (id(), "A-02", "27U", 27_i32),
         (id(), "EDGE-01", "18U", 18_i32),
     ];
-    for (rack_id, code, specification, total_u) in &racks {
-        sqlx::query("INSERT INTO racks (id, area_id, code, specification, total_u, power_capacity_w, status, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 'active', NULL, ?, ?)")
-            .bind(rack_id).bind(&area_id).bind(code).bind(specification).bind(total_u).bind(&timestamp).bind(&timestamp).execute(&mut *transaction).await
+    for (sort_order, (rack_id, code, specification, total_u)) in racks.iter().enumerate() {
+        sqlx::query("INSERT INTO racks (id, area_id, code, specification, total_u, power_capacity_w, status, notes, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?, NULL, 'active', NULL, ?, ?, ?)")
+            .bind(rack_id).bind(&area_id).bind(code).bind(specification).bind(total_u).bind(&timestamp).bind(&timestamp).bind(sort_order as i64).execute(&mut *transaction).await
             .map_err(|error| AppErrorDto::database(operation_id, error))?;
     }
 
@@ -713,13 +806,14 @@ mod tests {
     use crate::{
         dto::{
             CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput, PlaceAssetInput,
+            ReorderRacksInput,
         },
         state::AppState,
     };
 
     use super::{
         create_area, create_asset, create_rack, create_room, get_rack_view, place_asset,
-        seed_dev_data,
+        reorder_racks, seed_dev_data,
     };
 
     async fn fixture() -> AppState {
@@ -913,6 +1007,82 @@ mod tests {
                 .map(|rack| rack.placements.len())
                 .sum::<usize>(),
             4
+        );
+    }
+
+    #[tokio::test]
+    async fn reorders_visible_racks_and_preserves_hidden_slots() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let before = get_rack_view(&state.pool, None, "op").await.unwrap();
+        let ids: Vec<String> = before
+            .racks
+            .iter()
+            .map(|rack| rack.rack.id.clone())
+            .collect();
+        sqlx::query("UPDATE racks SET sort_order = 100 WHERE id = ?")
+            .bind(&ids[1])
+            .execute(&state.pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE racks SET sort_order = 101 WHERE id = ?")
+            .bind(&ids[2])
+            .execute(&state.pool)
+            .await
+            .unwrap();
+
+        reorder_racks(
+            &state.pool,
+            ReorderRacksInput {
+                rack_ids: vec![ids[2].clone(), ids[0].clone()],
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+
+        let after = get_rack_view(&state.pool, None, "op").await.unwrap();
+        let reordered: Vec<String> = after
+            .racks
+            .iter()
+            .map(|rack| rack.rack.id.clone())
+            .collect();
+        assert_eq!(
+            reordered,
+            vec![ids[2].clone(), ids[1].clone(), ids[0].clone()]
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_rack_order_without_changing_data() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let before = get_rack_view(&state.pool, None, "op").await.unwrap();
+        let first_id = before.racks[0].rack.id.clone();
+
+        let error = reorder_racks(
+            &state.pool,
+            ReorderRacksInput {
+                rack_ids: vec![first_id.clone(), first_id],
+            },
+            "op",
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, "Rack.OrderDuplicate");
+
+        let after = get_rack_view(&state.pool, None, "op").await.unwrap();
+        assert_eq!(
+            before
+                .racks
+                .iter()
+                .map(|rack| &rack.rack.id)
+                .collect::<Vec<_>>(),
+            after
+                .racks
+                .iter()
+                .map(|rack| &rack.rack.id)
+                .collect::<Vec<_>>()
         );
     }
 }

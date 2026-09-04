@@ -13,6 +13,7 @@ export const commands = {
 	createAsset: (input: CreateAssetInput) => typedError<AssetDto, AppErrorDto>(__TAURI_INVOKE("create_asset", { input })),
 	placeAsset: (input: PlaceAssetInput) => typedError<PlacementDto, AppErrorDto>(__TAURI_INVOKE("place_asset", { input })),
 	getRackView: (areaId: string | null) => typedError<RackViewDto, AppErrorDto>(__TAURI_INVOKE("get_rack_view", { areaId })),
+	reorderRacks: (input: ReorderRacksInput) => typedError<ReorderRacksResultDto, AppErrorDto>(__TAURI_INVOKE("reorder_racks", { input })),
 	seedDevData: () => typedError<SeedResultDto, AppErrorDto>(__TAURI_INVOKE("seed_dev_data")),
 };
 
@@ -165,6 +166,14 @@ export type RackPlacementViewDto = {
 
 export type RackViewDto = {
 	racks: RackCanvasDto[],
+};
+
+export type ReorderRacksInput = {
+	rackIds: string[],
+};
+
+export type ReorderRacksResultDto = {
+	rackIds: string[],
 };
 
 export type RoomDto = {

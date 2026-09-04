@@ -4,7 +4,8 @@ use crate::{
     application,
     dto::{
         AreaDto, AssetDto, CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput,
-        LocationTreeDto, PlaceAssetInput, PlacementDto, RackDto, RackViewDto, RoomDto,
+        LocationTreeDto, PlaceAssetInput, PlacementDto, RackDto, RackViewDto, ReorderRacksInput,
+        ReorderRacksResultDto, RoomDto,
     },
     error::{AppErrorDto, operation_id},
     state::AppState,
@@ -95,6 +96,16 @@ pub async fn get_rack_view(
 ) -> Result<RackViewDto, AppErrorDto> {
     let operation_id = operation_id();
     application::get_rack_view(&state.pool, area_id, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn reorder_racks(
+    state: State<'_, AppState>,
+    input: ReorderRacksInput,
+) -> Result<ReorderRacksResultDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::reorder_racks(&state.pool, input, &operation_id).await
 }
 
 #[cfg(debug_assertions)]

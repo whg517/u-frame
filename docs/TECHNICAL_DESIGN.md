@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.4 |
+| 版本 | v0.5 |
 | 更新日期 | 2026-09-04 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
@@ -158,17 +158,21 @@ src/
 |---|---|
 | 机房、机柜、设备、放置关系、导入任务 | Rust + SQLite，前端使用 Query 缓存 |
 | 当前筛选、搜索词、画布缩放、选中设备 | 页面或 feature 本地状态 |
+| 机柜横向展示顺序 | Rust + SQLite `racks.sort_order` |
 | 表单草稿与字段错误 | React Hook Form |
 | 跨页面持久偏好 | 需求出现后再引入轻量持久化，不预先建立全局 store |
 
 ### 5.4 机柜画布实现
 
 - 每个机柜使用固定 U 高度比例，顶部为最大 U，底部为 U1。
-- U 位网格使用 CSS 背景或单一网格层绘制，避免为每条装饰线创建复杂 DOM。
+- 画布背景使用两层 CSS 线性渐变绘制低对比度方格，网格尺寸与当前缩放比例同步。
+- 缩放范围固定为 50%–160%，由页面本地状态管理；缩放不写入数据库。
 - 设备块位置由 `startU` 和 `heightU` 计算，不保存像素坐标。
 - 多机柜采用横向或二维虚拟化；只渲染可视区域和少量缓冲区。
-- 设备选中后打开详情侧栏；上架和移动通过表单完成，不实现拖拽。
-- 缩放改变统一的 U 单位尺寸，设备块与刻度共用同一计算函数。
+- 设备选中后打开详情侧栏；上架和移动通过表单完成，不实现设备拖拽。
+- 机柜标题作为拖动手柄，前端乐观更新顺序，保存失败回滚；同时提供左右方向键操作。
+- 前端只提交当前画布内完整的机柜 ID 顺序；后端在事务中将该顺序写入当前全局顺序槽，保留筛选范围外机柜的相对顺序。
+- 机柜和设备在同一 DOM 树中整体缩放，确保 U 位刻度与设备块不会产生比例漂移。
 
 ## 6. Rust 后端设计
 
@@ -217,7 +221,7 @@ SQLite 建议配置：
 | 模块 | 主要 Commands |
 |---|---|
 | locations | `list_locations`、`create_room`、`create_area`、`update_location`、`archive_location` |
-| racks | `list_racks`、`get_rack_view`、`create_rack`、`update_rack`、`archive_rack` |
+| racks | `list_racks`、`get_rack_view`、`create_rack`、`reorder_racks`、`update_rack`、`archive_rack` |
 | assets | `list_assets`、`get_asset`、`create_asset`、`update_asset`、`archive_asset` |
 | placements | `place_asset`、`move_asset`、`unmount_asset` |
 | imports | `preview_asset_import`、`apply_asset_import`、`get_import_job` |
@@ -297,6 +301,7 @@ audit_logs ── 记录业务实体变更
 | power_capacity_w | INTEGER | 可空，非负 |
 | status | TEXT | `active` / `archived` |
 | notes | TEXT | 可空 |
+| sort_order | INTEGER | 非空，机柜画布展示顺序 |
 | created_at / updated_at | TEXT | UTC RFC 3339 |
 
 唯一约束：`UNIQUE(area_id, code)`。
@@ -534,7 +539,7 @@ pnpm tauri build --bundles dmg
 2. 已采用 SQLx，加入应用数据目录数据库初始化和内嵌迁移。
 3. 已实现机房、区域、机柜和设备的创建与查看主链路；编辑和归档留待 Slice 2。
 4. 已实现首次上架领域规则和数据库约束；移动、下架事务留待 Slice 2。
-5. 已实现多机柜画布与设备详情交互；缩放和虚拟化留待 Slice 2。
+5. 已实现网格多机柜画布、50%–160% 缩放、机柜顺序持久化和设备详情交互；虚拟化留待后续切片。
 6. 实现导入 staging、差异预览、确认应用和导出。
 7. 实现审计、备份、恢复和迁移兼容测试。
 8. 配置质量门禁、macOS 签名、公证和安装验证。
@@ -552,7 +557,7 @@ pnpm tauri build --bundles dmg
 Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目录、最小权限、前端 lint/测试和 Rust 测试。后续差距包括：
 
 - 编辑、归档、移动、下架、审计和历史查询尚未实现。
-- 画布缩放、可视区域虚拟化及 100 台机柜性能验证尚未实现。
+- 可视区域虚拟化及 100 台机柜性能验证尚未实现。
 - Excel、导出、备份和恢复适配器尚未实现。
 - 远程 CI、签名、公证和安装包发布门禁尚未建立。
 
@@ -575,3 +580,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.2 | 2026-09-04 | 建立与用户故事文档的双向关联。 |
 | v0.3 | 2026-09-04 | 接入 worktree、提交门禁和 squash 合并开发规范。 |
 | v0.4 | 2026-09-04 | 记录 Iteration 001 已采用的 SQLx、tauri-specta、前端 UI/状态方案及当前实现差距。 |
+| v0.5 | 2026-09-04 | 记录网格画布、缩放边界、机柜排序事务、`sort_order` 迁移及 `reorder_racks` IPC。 |

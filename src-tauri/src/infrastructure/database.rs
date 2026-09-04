@@ -53,7 +53,7 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
-        sqlx::query("INSERT INTO racks VALUES ('rack', 'area', 'A-01', '18U', 18, NULL, 'active', NULL, 'now', 'now')")
+        sqlx::query("INSERT INTO racks (id, area_id, code, specification, total_u, power_capacity_w, status, notes, created_at, updated_at) VALUES ('rack', 'area', 'A-01', '18U', 18, NULL, 'active', NULL, 'now', 'now')")
             .execute(pool)
             .await
             .unwrap();

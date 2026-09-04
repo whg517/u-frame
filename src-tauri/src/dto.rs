@@ -55,6 +55,12 @@ pub struct PlaceAssetInput {
     pub start_u: i32,
 }
 
+#[derive(Clone, Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderRacksInput {
+    pub rack_ids: Vec<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RoomDto {
@@ -182,6 +188,12 @@ pub struct RackCanvasDto {
 #[serde(rename_all = "camelCase")]
 pub struct RackViewDto {
     pub racks: Vec<RackCanvasDto>,
+}
+
+#[derive(Clone, Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderRacksResultDto {
+    pub rack_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]

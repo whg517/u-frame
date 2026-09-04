@@ -139,7 +139,7 @@ where
         JOIN areas a ON a.id = r.area_id
         JOIN rooms room ON room.id = a.room_id
         WHERE r.status = 'active' AND (?1 IS NULL OR r.area_id = ?1)
-        ORDER BY room.code, a.code, r.code
+        ORDER BY r.sort_order, r.id
         "#,
     )
     .bind(area_id)
@@ -195,10 +195,21 @@ where
         LEFT JOIN rack_placements p ON p.rack_id = rack.id AND p.removed_at IS NULL
         LEFT JOIN assets asset ON asset.id = p.asset_id
         WHERE rack.status = 'active' AND (?1 IS NULL OR rack.area_id = ?1)
-        ORDER BY room.code, area.code, rack.code, p.start_u DESC
+        ORDER BY rack.sort_order, rack.id, p.start_u DESC
         "#,
     )
     .bind(area_id)
+    .fetch_all(executor)
+    .await
+}
+
+pub async fn list_active_rack_ids<'e, E>(executor: E) -> Result<Vec<String>, sqlx::Error>
+where
+    E: SqliteExecutor<'e>,
+{
+    sqlx::query_scalar::<_, String>(
+        "SELECT id FROM racks WHERE status = 'active' ORDER BY sort_order, id",
+    )
     .fetch_all(executor)
     .await
 }

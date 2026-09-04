@@ -1,13 +1,91 @@
+.rack-canvas-viewport {
+  --canvas-zoom: 1;
+  --canvas-grid-size: calc(24px * var(--canvas-zoom));
+  position: relative;
+  background-color: color-mix(in oklch, var(--background) 97%, var(--foreground));
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px);
+  background-size: var(--canvas-grid-size) var(--canvas-grid-size);
+}
+
+.rack-zoom-layer {
+  width: max-content;
+  transform-origin: top left;
+}
+
 .rack-stage {
   --rack-line: color-mix(in oklch, var(--foreground) 54%, transparent);
   --rack-line-soft: color-mix(in oklch, var(--foreground) 24%, transparent);
   --rack-panel: color-mix(in oklch, var(--foreground) 14%, var(--background));
-  background-color: color-mix(in oklch, var(--background) 97%, var(--foreground));
 }
 
 .rack-frame {
+  position: relative;
   width: 254px;
   color: var(--foreground);
+  transition: opacity 120ms ease;
+}
+
+.rack-frame[data-dragging="true"] {
+  opacity: 0.38;
+}
+
+.rack-frame[data-drop-position="before"]::before,
+.rack-frame[data-drop-position="after"]::after {
+  position: absolute;
+  top: 38px;
+  bottom: 0;
+  z-index: 5;
+  width: 2px;
+  content: "";
+  border-radius: 999px;
+  background: var(--foreground);
+}
+
+.rack-frame[data-drop-position="before"]::before {
+  left: -24px;
+}
+
+.rack-frame[data-drop-position="after"]::after {
+  right: -24px;
+}
+
+.rack-title-wrap {
+  height: 42px;
+  margin-bottom: 12px;
+  padding-left: 34px;
+  text-align: center;
+}
+
+.rack-drag-handle {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  border-radius: 4px;
+  padding: 2px 8px 3px 3px;
+  color: inherit;
+  cursor: grab;
+  text-align: center;
+}
+
+.rack-drag-handle:hover {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+
+.rack-drag-handle:focus-visible {
+  outline: 1px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+.rack-drag-handle:active {
+  cursor: grabbing;
+}
+
+.rack-drag-handle svg {
+  width: 12px;
+  color: var(--muted-foreground);
 }
 
 .rack-cap {
@@ -120,4 +198,37 @@
   height: 30px;
   margin-left: 34px;
   border: 1px solid var(--rack-line);
+}
+
+.rack-zoom-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  width: max-content;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--background) 92%, transparent);
+  box-shadow: 0 4px 18px color-mix(in oklch, var(--foreground) 12%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.rack-canvas-message {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 21;
+  width: max-content;
+  max-width: min(480px, calc(100% - 200px));
+  padding: 7px 10px;
+  border: 1px solid color-mix(in oklch, var(--destructive) 32%, transparent);
+  border-radius: 7px;
+  background: var(--background);
+  color: var(--destructive);
+  font-size: 12px;
+  transform: translateX(-50%);
 }
