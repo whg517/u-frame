@@ -1,6 +1,9 @@
 use std::net::IpAddr;
 
-use crate::{dto::CreateAssetInput, error::AppErrorDto};
+use crate::{
+    dto::{CreateAssetInput, UpdateAssetInput},
+    error::AppErrorDto,
+};
 
 pub const COMMON_RACK_SIZES: [i32; 8] = [18, 22, 27, 32, 37, 42, 45, 47];
 pub const ASSET_TYPES: [&str; 4] = ["server", "switch", "router", "firewall"];
@@ -72,7 +75,39 @@ pub fn validate_rack(
 }
 
 pub fn validate_asset(input: &CreateAssetInput, operation_id: &str) -> Result<(), AppErrorDto> {
-    if !ASSET_TYPES.contains(&input.asset_type.as_str()) {
+    validate_asset_fields(
+        &input.asset_type,
+        &input.status,
+        input.height_u,
+        input.intranet_ip.as_deref(),
+        input.management_ip.as_deref(),
+        operation_id,
+    )
+}
+
+pub fn validate_asset_update(
+    input: &UpdateAssetInput,
+    operation_id: &str,
+) -> Result<(), AppErrorDto> {
+    validate_asset_fields(
+        &input.asset_type,
+        &input.status,
+        input.height_u,
+        input.intranet_ip.as_deref(),
+        input.management_ip.as_deref(),
+        operation_id,
+    )
+}
+
+fn validate_asset_fields(
+    asset_type: &str,
+    status: &str,
+    height_u: i32,
+    intranet_ip: Option<&str>,
+    management_ip: Option<&str>,
+    operation_id: &str,
+) -> Result<(), AppErrorDto> {
+    if !ASSET_TYPES.contains(&asset_type) {
         return Err(AppErrorDto::validation(
             operation_id,
             "Asset.InvalidType",
@@ -80,7 +115,7 @@ pub fn validate_asset(input: &CreateAssetInput, operation_id: &str) -> Result<()
             "type",
         ));
     }
-    if !ASSET_STATUSES.contains(&input.status.as_str()) {
+    if !ASSET_STATUSES.contains(&status) {
         return Err(AppErrorDto::validation(
             operation_id,
             "Asset.InvalidStatus",
@@ -88,7 +123,7 @@ pub fn validate_asset(input: &CreateAssetInput, operation_id: &str) -> Result<()
             "status",
         ));
     }
-    if input.height_u < 1 || input.height_u > 100 {
+    if !(1..=100).contains(&height_u) {
         return Err(AppErrorDto::validation(
             operation_id,
             "Asset.InvalidHeight",
@@ -96,10 +131,7 @@ pub fn validate_asset(input: &CreateAssetInput, operation_id: &str) -> Result<()
             "heightU",
         ));
     }
-    for (field, value) in [
-        ("intranetIp", input.intranet_ip.as_deref()),
-        ("managementIp", input.management_ip.as_deref()),
-    ] {
+    for (field, value) in [("intranetIp", intranet_ip), ("managementIp", management_ip)] {
         if let Some(value) = value.filter(|value| !value.trim().is_empty())
             && value.trim().parse::<IpAddr>().is_err()
         {

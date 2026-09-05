@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { Link, useNavigate } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -15,6 +16,7 @@ import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
+import { useLocations } from "./queries"
 
 const schema = z.object({
   code: z.string().trim().min(1, "请输入机房编码"),
@@ -24,36 +26,67 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function RoomFormPage() {
+  const { roomId } = useParams()
+  const isEditing = Boolean(roomId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const locations = useLocations()
+  const room = locations.data?.rooms.find((node) => node.room.id === roomId)?.room
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { code: "", name: "", description: "" },
   })
-  const create = useMutation({
-    mutationFn: tauriClient.createRoom,
+  useEffect(() => {
+    if (!room) return
+    form.reset({
+      code: room.code,
+      name: room.name,
+      description: room.description ?? "",
+    })
+  }, [form, room])
+  const save = useMutation({
+    mutationFn: (values: FormData) => {
+      const input = { ...values, description: values.description || null }
+      return roomId
+        ? tauriClient.updateRoom({ roomId, ...input })
+        : tauriClient.createRoom(input)
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.locations })
-      navigate("/locations")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.locations }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.racksRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
+      ])
+      navigate(roomId ? `/locations/rooms/${roomId}` : "/locations")
     },
   })
 
+  if (isEditing && locations.isPending) {
+    return <RoomFormState title="编辑机房" message="正在读取机房…" />
+  }
+  if (isEditing && (locations.isError || !room)) {
+    return <RoomFormState title="编辑机房" message={locations.isError ? errorMessage(locations.error) : "没有找到这个机房。"} error />
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader eyebrow="Location" title="新建机房" description="创建物理位置的第一层。" />
+      <PageHeader
+        eyebrow="Location"
+        title={isEditing ? "编辑机房" : "新建机房"}
+        description={isEditing ? "修改机房编码、名称和描述。" : "创建物理位置的第一层。"}
+      />
       <PageBody>
         <Card className="mx-auto max-w-2xl">
           <CardContent>
             <form
               className="space-y-5"
-              onSubmit={form.handleSubmit((values) =>
-                create.mutate({ ...values, description: values.description || null }),
-              )}
+              onSubmit={form.handleSubmit((values) => save.mutate(values))}
             >
-              {create.isError ? (
+              {save.isError ? (
                 <Alert variant="destructive">
                   <AlertTitle>保存失败</AlertTitle>
-                  <AlertDescription>{errorMessage(create.error)}</AlertDescription>
+                  <AlertDescription>{errorMessage(save.error)}</AlertDescription>
                 </Alert>
               ) : null}
               <div className="grid gap-5 sm:grid-cols-2">
@@ -68,11 +101,11 @@ export function RoomFormPage() {
                 <Textarea id="description" placeholder="可选" {...form.register("description")} />
               </FormField>
               <div className="flex justify-end gap-2 border-t pt-5">
-                <Button variant="ghost" nativeButton={false} render={<Link to="/locations" />}>
+                <Button variant="ghost" nativeButton={false} render={<Link to={roomId ? `/locations/rooms/${roomId}` : "/locations"} />}>
                   <ArrowLeft /> 取消
                 </Button>
-                <Button type="submit" disabled={create.isPending}>
-                  {create.isPending ? "正在保存…" : "保存机房"}
+                <Button type="submit" disabled={save.isPending}>
+                  {save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存机房"}
                 </Button>
               </div>
             </form>
@@ -81,4 +114,8 @@ export function RoomFormPage() {
       </PageBody>
     </div>
   )
+}
+
+function RoomFormState({ title, message, error = false }: { title: string; message: string; error?: boolean }) {
+  return <div className="flex min-h-0 flex-1 flex-col"><PageHeader title={title} /><PageBody><p className={error ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{message}</p></PageBody></div>
 }

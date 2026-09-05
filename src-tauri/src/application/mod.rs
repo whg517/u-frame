@@ -10,7 +10,7 @@ use crate::{
         AreaDto, AssetDto, AssetPlacementDto, CreateAreaInput, CreateAssetInput, CreateRackInput,
         CreateRoomInput, LocationTreeDto, PlaceAssetInput, PlacementDto, RackCanvasDto, RackDto,
         RackPlacementViewDto, RackViewDto, ReorderRacksInput, ReorderRacksResultDto, RoomDto,
-        RoomNodeDto,
+        RoomNodeDto, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
     },
     error::AppErrorDto,
     infrastructure::repository,
@@ -182,6 +182,44 @@ pub async fn create_room(
     })
 }
 
+pub async fn update_room(
+    pool: &SqlitePool,
+    input: UpdateRoomInput,
+    operation_id: &str,
+) -> Result<RoomDto, AppErrorDto> {
+    let room_id = domain::required(&input.room_id, operation_id, "roomId")?;
+    let code = domain::required(&input.code, operation_id, "code")?;
+    let name = domain::required(&input.name, operation_id, "name")?;
+    let description = domain::optional(input.description);
+    let timestamp = now();
+    let result = sqlx::query(
+        "UPDATE rooms SET code = ?, name = ?, description = ?, updated_at = ? WHERE id = ? AND status = 'active'",
+    )
+    .bind(&code)
+    .bind(&name)
+    .bind(&description)
+    .bind(&timestamp)
+    .bind(&room_id)
+    .execute(pool)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    if result.rows_affected() == 0 {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Room.NotFound",
+            "机房不存在或不可用",
+            "roomId",
+        ));
+    }
+    Ok(RoomDto {
+        id: room_id,
+        code,
+        name,
+        description,
+        status: "active".into(),
+    })
+}
+
 pub async fn create_area(
     pool: &SqlitePool,
     input: CreateAreaInput,
@@ -219,6 +257,60 @@ pub async fn create_area(
     .execute(pool)
     .await
     .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    Ok(AreaDto {
+        id: area_id,
+        room_id,
+        code,
+        name,
+        description,
+        status: "active".into(),
+    })
+}
+
+pub async fn update_area(
+    pool: &SqlitePool,
+    input: UpdateAreaInput,
+    operation_id: &str,
+) -> Result<AreaDto, AppErrorDto> {
+    let area_id = domain::required(&input.area_id, operation_id, "areaId")?;
+    let room_id = domain::required(&input.room_id, operation_id, "roomId")?;
+    let code = domain::required(&input.code, operation_id, "code")?;
+    let name = domain::required(&input.name, operation_id, "name")?;
+    let description = domain::optional(input.description);
+    let parent_status = sqlx::query_scalar::<_, String>("SELECT status FROM rooms WHERE id = ?")
+        .bind(&room_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    if parent_status.as_deref() != Some("active") {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Area.RoomUnavailable",
+            "所属机房不存在或不可用",
+            "roomId",
+        ));
+    }
+    let timestamp = now();
+    let result = sqlx::query(
+        "UPDATE areas SET room_id = ?, code = ?, name = ?, description = ?, updated_at = ? WHERE id = ? AND status = 'active'",
+    )
+    .bind(&room_id)
+    .bind(&code)
+    .bind(&name)
+    .bind(&description)
+    .bind(&timestamp)
+    .bind(&area_id)
+    .execute(pool)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    if result.rows_affected() == 0 {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Area.NotFound",
+            "区域不存在或不可用",
+            "areaId",
+        ));
+    }
     Ok(AreaDto {
         id: area_id,
         room_id,
@@ -319,6 +411,108 @@ pub async fn create_rack(
     })
 }
 
+pub async fn update_rack(
+    pool: &SqlitePool,
+    input: UpdateRackInput,
+    operation_id: &str,
+) -> Result<RackDto, AppErrorDto> {
+    let rack_id = domain::required(&input.rack_id, operation_id, "rackId")?;
+    let area_id = domain::required(&input.area_id, operation_id, "areaId")?;
+    let code = domain::required(&input.code, operation_id, "code")?;
+    let specification = domain::required(&input.specification, operation_id, "specification")?;
+    domain::validate_rack(
+        &specification,
+        input.total_u,
+        input.power_capacity_w,
+        operation_id,
+    )?;
+    let notes = domain::optional(input.notes);
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let parent = sqlx::query(
+        "SELECT area.status AS area_status, area.name AS area_name, room.id AS room_id, room.name AS room_name, room.status AS room_status FROM areas area JOIN rooms room ON room.id = area.room_id WHERE area.id = ?",
+    )
+    .bind(&area_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let Some(parent) = parent else {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Rack.AreaUnavailable",
+            "所属区域不存在",
+            "areaId",
+        ));
+    };
+    if parent.get::<String, _>("area_status") != "active"
+        || parent.get::<String, _>("room_status") != "active"
+    {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Rack.AreaUnavailable",
+            "所属区域或机房不可用",
+            "areaId",
+        ));
+    }
+    let highest_end_u: Option<i32> = sqlx::query_scalar(
+        "SELECT MAX(start_u + height_u - 1) FROM rack_placements WHERE rack_id = ? AND removed_at IS NULL",
+    )
+    .bind(&rack_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    if highest_end_u.is_some_and(|end_u| end_u > input.total_u) {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Rack.HeightOccupied",
+            "机柜缩容会使现有设备超出 U 位范围",
+            "totalU",
+        ));
+    }
+    let timestamp = now();
+    let result = sqlx::query(
+        "UPDATE racks SET area_id = ?, code = ?, specification = ?, total_u = ?, power_capacity_w = ?, notes = ?, updated_at = ? WHERE id = ? AND status = 'active'",
+    )
+    .bind(&area_id)
+    .bind(&code)
+    .bind(&specification)
+    .bind(input.total_u)
+    .bind(input.power_capacity_w)
+    .bind(&notes)
+    .bind(&timestamp)
+    .bind(&rack_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    if result.rows_affected() == 0 {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Rack.NotFound",
+            "机柜不存在或不可用",
+            "rackId",
+        ));
+    }
+    transaction
+        .commit()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    Ok(RackDto {
+        id: rack_id,
+        area_id,
+        area_name: parent.get("area_name"),
+        room_id: parent.get("room_id"),
+        room_name: parent.get("room_name"),
+        code,
+        specification,
+        total_u: input.total_u,
+        power_capacity_w: input.power_capacity_w,
+        status: "active".into(),
+        notes,
+    })
+}
+
 pub async fn list_assets(
     pool: &SqlitePool,
     operation_id: &str,
@@ -388,6 +582,128 @@ pub async fn create_asset(
         notes,
         placement: None,
     })
+}
+
+pub async fn update_asset(
+    pool: &SqlitePool,
+    input: UpdateAssetInput,
+    operation_id: &str,
+) -> Result<AssetDto, AppErrorDto> {
+    domain::validate_asset_update(&input, operation_id)?;
+    let asset_id = domain::required(&input.asset_id, operation_id, "assetId")?;
+    let name = domain::required(&input.name, operation_id, "name")?;
+    let hostname = domain::optional(input.hostname);
+    let intranet_ip = domain::optional(input.intranet_ip);
+    let management_ip = domain::optional(input.management_ip);
+    let serial_number = domain::optional(input.serial_number);
+    let vendor = domain::optional(input.vendor);
+    let model = domain::optional(input.model);
+    let purpose = domain::optional(input.purpose);
+    let notes = domain::optional(input.notes);
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let current = sqlx::query(
+        r#"
+        SELECT asset.id, placement.id AS placement_id, placement.rack_id, placement.start_u,
+               rack.total_u
+        FROM assets asset
+        LEFT JOIN rack_placements placement
+          ON placement.asset_id = asset.id AND placement.removed_at IS NULL
+        LEFT JOIN racks rack ON rack.id = placement.rack_id
+        WHERE asset.id = ? AND asset.status != 'archived'
+        "#,
+    )
+    .bind(&asset_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let Some(current) = current else {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Asset.NotFound",
+            "设备不存在或不可用",
+            "assetId",
+        ));
+    };
+    if let (Some(placement_id), Some(rack_id), Some(start_u), Some(total_u)) = (
+        current.try_get::<String, _>("placement_id").ok(),
+        current.try_get::<String, _>("rack_id").ok(),
+        current.try_get::<i32, _>("start_u").ok(),
+        current.try_get::<i32, _>("total_u").ok(),
+    ) {
+        let (_, end_u) =
+            domain::placement_range(start_u, input.height_u, total_u, &rack_id, operation_id)?;
+        let conflict: Option<String> = sqlx::query_scalar(
+            r#"
+            SELECT asset_id FROM rack_placements
+            WHERE rack_id = ? AND id != ? AND removed_at IS NULL
+              AND start_u <= ? AND start_u + height_u - 1 >= ?
+            LIMIT 1
+            "#,
+        )
+        .bind(&rack_id)
+        .bind(&placement_id)
+        .bind(end_u)
+        .bind(start_u)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        if let Some(conflicting_asset_id) = conflict {
+            return Err(AppErrorDto::placement(
+                operation_id,
+                "Placement.Overlap",
+                "修改后的设备高度与现有设备重叠",
+                &rack_id,
+                start_u,
+                end_u,
+                Some(conflicting_asset_id),
+            ));
+        }
+    }
+    let timestamp = now();
+    sqlx::query(
+        r#"
+        UPDATE assets SET type = ?, name = ?, hostname = ?, intranet_ip = ?, management_ip = ?,
+            serial_number = ?, vendor = ?, model = ?, purpose = ?, height_u = ?, status = ?,
+            notes = ?, updated_at = ?
+        WHERE id = ? AND status != 'archived'
+        "#,
+    )
+    .bind(&input.asset_type)
+    .bind(&name)
+    .bind(&hostname)
+    .bind(&intranet_ip)
+    .bind(&management_ip)
+    .bind(&serial_number)
+    .bind(&vendor)
+    .bind(&model)
+    .bind(&purpose)
+    .bind(input.height_u)
+    .bind(&input.status)
+    .bind(&notes)
+    .bind(&timestamp)
+    .bind(&asset_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    repository::find_asset(pool, &asset_id)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?
+        .map(asset_dto)
+        .ok_or_else(|| {
+            AppErrorDto::validation(
+                operation_id,
+                "Asset.NotFound",
+                "设备不存在或不可用",
+                "assetId",
+            )
+        })
 }
 
 pub async fn place_asset(
@@ -806,14 +1122,15 @@ mod tests {
     use crate::{
         dto::{
             CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput, PlaceAssetInput,
-            ReorderRacksInput,
+            ReorderRacksInput, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
         },
         state::AppState,
     };
 
     use super::{
-        create_area, create_asset, create_rack, create_room, get_rack_view, place_asset,
-        reorder_racks, seed_dev_data,
+        create_area, create_asset, create_rack, create_room, get_rack_view, list_assets,
+        list_locations, list_racks, place_asset, reorder_racks, seed_dev_data, update_area,
+        update_asset, update_rack, update_room,
     };
 
     async fn fixture() -> AppState {
@@ -1084,5 +1401,225 @@ mod tests {
                 .map(|rack| &rack.rack.id)
                 .collect::<Vec<_>>()
         );
+    }
+
+    #[tokio::test]
+    async fn updates_room_area_rack_and_asset_fields() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let locations = list_locations(&state.pool, "op").await.unwrap();
+        let room = &locations.rooms[0].room;
+        let area = &locations.rooms[0].areas[0];
+        update_room(
+            &state.pool,
+            UpdateRoomInput {
+                room_id: room.id.clone(),
+                code: "LAB".into(),
+                name: "实验机房".into(),
+                description: Some("更新后的机房".into()),
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+        update_area(
+            &state.pool,
+            UpdateAreaInput {
+                area_id: area.id.clone(),
+                room_id: room.id.clone(),
+                code: "B".into(),
+                name: "B 区".into(),
+                description: Some("更新后的区域".into()),
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+        let rack = list_racks(&state.pool, None, "op").await.unwrap().remove(0);
+        update_rack(
+            &state.pool,
+            UpdateRackInput {
+                rack_id: rack.id.clone(),
+                area_id: area.id.clone(),
+                code: "B-01".into(),
+                specification: "45U".into(),
+                total_u: 45,
+                power_capacity_w: Some(8000),
+                notes: Some("更新后的机柜".into()),
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+        let asset = list_assets(&state.pool, "op")
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|asset| {
+                asset
+                    .placement
+                    .as_ref()
+                    .is_some_and(|placement| placement.start_u == 4)
+            })
+            .unwrap();
+        let updated_asset = update_asset(
+            &state.pool,
+            UpdateAssetInput {
+                asset_id: asset.id.clone(),
+                asset_type: "server".into(),
+                name: "更新后的设备".into(),
+                hostname: Some("updated-node".into()),
+                intranet_ip: Some("10.30.0.10".into()),
+                management_ip: Some("10.30.1.10".into()),
+                serial_number: Some("UPDATED-SN".into()),
+                vendor: Some("UFrame".into()),
+                model: Some("UF-2U".into()),
+                purpose: Some("验收".into()),
+                height_u: 3,
+                status: "maintenance".into(),
+                notes: Some("更新后的设备".into()),
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(updated_asset.name, "更新后的设备");
+        assert_eq!(updated_asset.management_ip.as_deref(), Some("10.30.1.10"));
+        assert_eq!(updated_asset.height_u, 3);
+        assert_eq!(updated_asset.placement.as_ref().unwrap().end_u, 6);
+        let view = get_rack_view(&state.pool, None, "op").await.unwrap();
+        let updated_rack = view
+            .racks
+            .iter()
+            .find(|item| item.rack.id == rack.id)
+            .unwrap();
+        assert_eq!(updated_rack.rack.room_name, "实验机房");
+        assert_eq!(updated_rack.rack.area_name, "B 区");
+        assert_eq!(updated_rack.rack.code, "B-01");
+        assert_eq!(updated_rack.rack.total_u, 45);
+    }
+
+    #[tokio::test]
+    async fn rejects_rack_shrink_that_would_hide_a_device() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let rack = get_rack_view(&state.pool, None, "op")
+            .await
+            .unwrap()
+            .racks
+            .into_iter()
+            .find(|item| {
+                item.placements
+                    .iter()
+                    .any(|placement| placement.start_u == 10)
+            })
+            .unwrap()
+            .rack;
+
+        let error = update_rack(
+            &state.pool,
+            UpdateRackInput {
+                rack_id: rack.id.clone(),
+                area_id: rack.area_id,
+                code: rack.code,
+                specification: "custom".into(),
+                total_u: 9,
+                power_capacity_w: rack.power_capacity_w,
+                notes: rack.notes,
+            },
+            "op",
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.code, "Rack.HeightOccupied");
+        let unchanged: i32 = sqlx::query_scalar("SELECT total_u FROM racks WHERE id = ?")
+            .bind(&rack.id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+        assert_eq!(unchanged, rack.total_u);
+    }
+
+    #[tokio::test]
+    async fn rejects_asset_height_overlap_and_keeps_original_height() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let asset = list_assets(&state.pool, "op")
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|asset| {
+                asset
+                    .placement
+                    .as_ref()
+                    .is_some_and(|placement| placement.start_u == 4)
+            })
+            .unwrap();
+
+        let error = update_asset(
+            &state.pool,
+            UpdateAssetInput {
+                asset_id: asset.id.clone(),
+                asset_type: asset.asset_type,
+                name: asset.name,
+                hostname: asset.hostname,
+                intranet_ip: asset.intranet_ip,
+                management_ip: asset.management_ip,
+                serial_number: asset.serial_number,
+                vendor: asset.vendor,
+                model: asset.model,
+                purpose: asset.purpose,
+                height_u: 7,
+                status: asset.status,
+                notes: asset.notes,
+            },
+            "op",
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.code, "Placement.Overlap");
+        let unchanged: i32 = sqlx::query_scalar("SELECT height_u FROM assets WHERE id = ?")
+            .bind(&asset.id)
+            .fetch_one(&state.pool)
+            .await
+            .unwrap();
+        assert_eq!(unchanged, 2);
+    }
+
+    #[tokio::test]
+    async fn database_triggers_guard_direct_rack_and_asset_height_updates() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let view = get_rack_view(&state.pool, None, "op").await.unwrap();
+        let rack = view
+            .racks
+            .iter()
+            .find(|item| {
+                item.placements
+                    .iter()
+                    .any(|placement| placement.start_u == 10)
+            })
+            .unwrap();
+        let rack_error = sqlx::query("UPDATE racks SET total_u = 9 WHERE id = ?")
+            .bind(&rack.rack.id)
+            .execute(&state.pool)
+            .await
+            .unwrap_err();
+        assert!(rack_error.to_string().contains("Rack.HeightOccupied"));
+
+        let lower_asset = rack
+            .placements
+            .iter()
+            .find(|placement| placement.start_u == 4)
+            .unwrap();
+        let asset_error = sqlx::query("UPDATE assets SET height_u = 7 WHERE id = ?")
+            .bind(&lower_asset.asset_id)
+            .execute(&state.pool)
+            .await
+            .unwrap_err();
+        assert!(asset_error.to_string().contains("Placement.Overlap"));
     }
 }

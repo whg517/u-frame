@@ -69,6 +69,10 @@ describe("location details", () => {
 
     expect(await screen.findByRole("heading", { name: "上海机房" })).toBeInTheDocument()
     expect(screen.getByText("核心机房")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "编辑机房" })).toHaveAttribute(
+      "href",
+      "/locations/rooms/room-1/edit",
+    )
     expect(screen.getByRole("link", { name: /网络区/ })).toHaveAttribute(
       "href",
       "/locations/areas/area-1",
@@ -83,6 +87,10 @@ describe("location details", () => {
 
     expect(await screen.findByRole("heading", { name: "网络区" })).toBeInTheDocument()
     expect(screen.getAllByText("42U")).toHaveLength(2)
+    expect(screen.getByRole("button", { name: "编辑区域" })).toHaveAttribute(
+      "href",
+      "/locations/areas/area-1/edit",
+    )
     expect(screen.getByRole("link", { name: /R-A01-01/ })).toHaveAttribute(
       "href",
       "/racks/rack-1",

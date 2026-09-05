@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.6 |
-| 更新日期 | 2026-09-04 |
+| 版本 | v0.7 |
+| 更新日期 | 2026-09-05 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
 | 关联文档 | [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [开发规范](DEVELOPMENT_GUIDE.md) |
@@ -167,6 +167,7 @@ src/
 - `/locations/rooms/:roomId` 和 `/locations/areas/:areaId` 展示物理位置层级、汇总值和下级对象。
 - `/racks/:rackId` 展示机柜静态属性、实时容量投影和活动设备列表。
 - `/assets/:assetId` 展示完整设备字段、当前放置和关联实体入口。
+- 对应的 `.../:id/edit` 路由复用创建表单及同一套 Zod 规则，加载时完整回填字段，保存后失效受影响的列表、详情和画布查询。
 - 详情页优先复用 `list_locations`、`list_racks`、`list_assets` 和 `get_rack_view` 的现有投影；当前数据规模下不增加仅返回同样字段的重复 IPC。
 - 跨 feature 的通用设备类型与状态标签位于 `shared/lib`，避免 feature 之间直接依赖。
 - 列表、机柜详情和画布设备侧栏提供稳定深链；无效或已归档 ID 显示可恢复的未找到状态。
@@ -182,6 +183,7 @@ src/
 - 机柜标题作为拖动手柄，前端乐观更新顺序，保存失败回滚；同时提供左右方向键操作。
 - 前端只提交当前画布内完整的机柜 ID 顺序；后端在事务中将该顺序写入当前全局顺序槽，保留筛选范围外机柜的相对顺序。
 - 机柜和设备在同一 DOM 树中整体缩放，确保 U 位刻度与设备块不会产生比例漂移。
+- 机房和区域筛选使用可重复 URL 参数保存多选值；参数缺失表示“全部”。前端一次读取完整机柜投影后取两级筛选交集，切换机房时裁剪无效区域选择。
 
 ## 6. Rust 后端设计
 
@@ -229,7 +231,7 @@ SQLite 建议配置：
 
 | 模块 | 主要 Commands |
 |---|---|
-| locations | `list_locations`、`create_room`、`create_area`、`update_location`、`archive_location` |
+| locations | `list_locations`、`create_room`、`update_room`、`create_area`、`update_area`、`archive_location` |
 | racks | `list_racks`、`get_rack_view`、`create_rack`、`reorder_racks`、`update_rack`、`archive_rack` |
 | assets | `list_assets`、`get_asset`、`create_asset`、`update_asset`、`archive_asset` |
 | placements | `place_asset`、`move_asset`、`unmount_asset` |
@@ -369,6 +371,7 @@ audit_logs
 - 放置范围为 `[start_u, start_u + height_u - 1]`。
 - 应用层先校验越界和重叠，用于给出友好错误。
 - 数据库事务内再次校验；推荐增加 INSERT/UPDATE trigger，阻止绕过应用服务的越界或重叠写入。
+- 已增加放置 UPDATE、机柜缩容和设备高度同步 trigger；编辑机柜高度或已上架设备高度时，应用层先返回友好错误，SQLite 再作为最终完整性边界。
 - 归档使用状态字段，不物理删除资产和放置历史。
 - 正式业务表不保存 Excel 原始行；原始导入内容只进入 staging 表。
 
@@ -546,7 +549,7 @@ pnpm tauri build --bundles dmg
 
 1. 已建立目标目录、错误类型和类型化 Tauri client 边界。
 2. 已采用 SQLx，加入应用数据目录数据库初始化和内嵌迁移。
-3. 已实现机房、区域、机柜和设备的创建、列表与独立详情主链路；编辑和归档留待 Slice 2。
+3. 已实现机房、区域、机柜和设备的创建、列表、独立详情及编辑主链路；归档留待后续切片。
 4. 已实现首次上架领域规则和数据库约束；移动、下架事务留待 Slice 2。
 5. 已实现网格多机柜画布、50%–160% 缩放、机柜顺序持久化和设备详情交互；虚拟化留待后续切片。
 6. 实现导入 staging、差异预览、确认应用和导出。
@@ -565,7 +568,7 @@ pnpm tauri build --bundles dmg
 
 Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目录、最小权限、前端 lint/测试和 Rust 测试。后续差距包括：
 
-- 编辑、归档、移动、下架、审计和历史查询尚未实现。
+- 归档、移动、下架、审计和历史查询尚未实现。
 - 可视区域虚拟化及 100 台机柜性能验证尚未实现。
 - Excel、导出、备份和恢复适配器尚未实现。
 - 远程 CI、签名、公证和安装包发布门禁尚未建立。
@@ -591,3 +594,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.4 | 2026-09-04 | 记录 Iteration 001 已采用的 SQLx、tauri-specta、前端 UI/状态方案及当前实现差距。 |
 | v0.5 | 2026-09-04 | 记录网格画布、缩放边界、机柜排序事务、`sort_order` 迁移及 `reorder_racks` IPC。 |
 | v0.6 | 2026-09-04 | 记录位置、机柜和资产详情路由、现有查询投影复用及跨实体深链。 |
+| v0.7 | 2026-09-05 | 记录四类实体编辑命令、编辑完整性 trigger，以及画布机房/区域多选 URL 筛选方案。 |

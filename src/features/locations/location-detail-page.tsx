@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, ChevronRight, MapPin } from "lucide-react"
+import { ArrowLeft, ChevronRight, MapPin, Pencil } from "lucide-react"
 import { Link, useParams } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
@@ -61,7 +61,14 @@ export function RoomDetailPage() {
         eyebrow="Room detail"
         title={node.room.name}
         description={`机房编码 ${node.room.code}`}
-        actions={<BackToLocations />}
+        actions={
+          <>
+            <BackToLocations />
+            <Button nativeButton={false} render={<Link to={`/locations/rooms/${node.room.id}/edit`} />}>
+              <Pencil /> 编辑机房
+            </Button>
+          </>
+        }
       />
       <PageBody>
         <div className="mx-auto grid max-w-5xl gap-6">
@@ -140,7 +147,14 @@ export function AreaDetailPage() {
         eyebrow="Area detail"
         title={area.name}
         description={`${roomNode.room.name} / ${area.code}`}
-        actions={<BackToLocations />}
+        actions={
+          <>
+            <BackToLocations />
+            <Button nativeButton={false} render={<Link to={`/locations/areas/${area.id}/edit`} />}>
+              <Pencil /> 编辑区域
+            </Button>
+          </>
+        }
       />
       <PageBody>
         <div className="mx-auto grid max-w-5xl gap-6">

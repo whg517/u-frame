@@ -5,7 +5,8 @@ use crate::{
     dto::{
         AreaDto, AssetDto, CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput,
         LocationTreeDto, PlaceAssetInput, PlacementDto, RackDto, RackViewDto, ReorderRacksInput,
-        ReorderRacksResultDto, RoomDto,
+        ReorderRacksResultDto, RoomDto, UpdateAreaInput, UpdateAssetInput, UpdateRackInput,
+        UpdateRoomInput,
     },
     error::{AppErrorDto, operation_id},
     state::AppState,
@@ -33,12 +34,32 @@ pub async fn create_room(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn update_room(
+    state: State<'_, AppState>,
+    input: UpdateRoomInput,
+) -> Result<RoomDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::update_room(&state.pool, input, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn create_area(
     state: State<'_, AppState>,
     input: CreateAreaInput,
 ) -> Result<AreaDto, AppErrorDto> {
     let operation_id = operation_id();
     application::create_area(&state.pool, input, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_area(
+    state: State<'_, AppState>,
+    input: UpdateAreaInput,
+) -> Result<AreaDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::update_area(&state.pool, input, &operation_id).await
 }
 
 #[tauri::command]
@@ -63,6 +84,16 @@ pub async fn create_rack(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn update_rack(
+    state: State<'_, AppState>,
+    input: UpdateRackInput,
+) -> Result<RackDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::update_rack(&state.pool, input, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn list_assets(state: State<'_, AppState>) -> Result<Vec<AssetDto>, AppErrorDto> {
     let operation_id = operation_id();
     application::list_assets(&state.pool, &operation_id).await
@@ -76,6 +107,16 @@ pub async fn create_asset(
 ) -> Result<AssetDto, AppErrorDto> {
     let operation_id = operation_id();
     application::create_asset(&state.pool, input, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_asset(
+    state: State<'_, AppState>,
+    input: UpdateAssetInput,
+) -> Result<AssetDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::update_asset(&state.pool, input, &operation_id).await
 }
 
 #[tauri::command]

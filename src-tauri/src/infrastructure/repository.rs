@@ -172,6 +172,31 @@ where
     .await
 }
 
+pub async fn find_asset<'e, E>(executor: E, asset_id: &str) -> Result<Option<AssetRow>, sqlx::Error>
+where
+    E: SqliteExecutor<'e>,
+{
+    sqlx::query_as::<_, AssetRow>(
+        r#"
+        SELECT asset.id, asset.type AS asset_type, asset.name, asset.hostname, asset.intranet_ip,
+               asset.management_ip, asset.serial_number, asset.vendor, asset.model, asset.purpose,
+               asset.height_u, asset.status, asset.notes,
+               p.id AS placement_id, rack.id AS rack_id, rack.code AS rack_code,
+               area.id AS area_id, area.name AS area_name, room.id AS room_id, room.name AS room_name,
+               p.start_u, p.height_u AS placement_height_u
+        FROM assets asset
+        LEFT JOIN rack_placements p ON p.asset_id = asset.id AND p.removed_at IS NULL
+        LEFT JOIN racks rack ON rack.id = p.rack_id
+        LEFT JOIN areas area ON area.id = rack.area_id
+        LEFT JOIN rooms room ON room.id = area.room_id
+        WHERE asset.id = ? AND asset.status != 'archived'
+        "#,
+    )
+    .bind(asset_id)
+    .fetch_optional(executor)
+    .await
+}
+
 pub async fn rack_view<'e, E>(
     executor: E,
     area_id: Option<&str>,

@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpToLine, LocateFixed } from "lucide-react"
+import { ArrowLeft, ArrowUpToLine, LocateFixed, Pencil } from "lucide-react"
 import { Link, useParams } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
@@ -36,6 +36,9 @@ export function AssetDetailPage() {
         actions={
           <>
             <BackToAssets />
+            <Button variant="outline" nativeButton={false} render={<Link to={`/assets/${asset.id}/edit`} />}>
+              <Pencil /> 编辑设备
+            </Button>
             {asset.placement ? (
               <Button nativeButton={false} render={<Link to={`/?area=${asset.placement.areaId}&highlight=${asset.id}`} />}>
                 <LocateFixed /> 在画布中定位

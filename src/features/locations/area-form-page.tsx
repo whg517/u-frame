@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus } from "lucide-react"
+import { useEffect, useMemo } from "react"
 import { useForm } from "react-hook-form"
-import { Link, useNavigate } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -27,6 +28,8 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function AreaFormPage() {
+  const { areaId } = useParams()
+  const isEditing = Boolean(areaId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const locations = useLocations()
@@ -34,17 +37,53 @@ export function AreaFormPage() {
     resolver: zodResolver(schema),
     defaultValues: { roomId: "", code: "", name: "", description: "" },
   })
-  const create = useMutation({
-    mutationFn: tauriClient.createArea,
+  const existing = useMemo(
+    () => locations.data?.rooms
+      .flatMap(({ room, areas }) => areas.map((area) => ({ area, room })))
+      .find(({ area }) => area.id === areaId),
+    [areaId, locations.data],
+  )
+  useEffect(() => {
+    if (!existing) return
+    form.reset({
+      roomId: existing.area.roomId,
+      code: existing.area.code,
+      name: existing.area.name,
+      description: existing.area.description ?? "",
+    })
+  }, [existing, form])
+  const save = useMutation({
+    mutationFn: (values: FormData) => {
+      const input = { ...values, description: values.description || null }
+      return areaId
+        ? tauriClient.updateArea({ areaId, ...input })
+        : tauriClient.createArea(input)
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.locations })
-      navigate("/locations")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.locations }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.racksRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
+      ])
+      navigate(areaId ? `/locations/areas/${areaId}` : "/locations")
     },
   })
 
+  if (isEditing && locations.isPending) {
+    return <AreaFormState title="编辑区域" message="正在读取区域…" />
+  }
+  if (isEditing && (locations.isError || !existing)) {
+    return <AreaFormState title="编辑区域" message={locations.isError ? errorMessage(locations.error) : "没有找到这个区域。"} error />
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader eyebrow="Location" title="新建区域" description="在已有机房下建立区域。" />
+      <PageHeader
+        eyebrow="Location"
+        title={isEditing ? "编辑区域" : "新建区域"}
+        description={isEditing ? "修改所属机房、编码、名称和描述。" : "在已有机房下建立区域。"}
+      />
       <PageBody>
         {locations.isSuccess && locations.data.rooms.length === 0 ? (
           <EmptyState
@@ -57,14 +96,12 @@ export function AreaFormPage() {
             <CardContent>
               <form
                 className="space-y-5"
-                onSubmit={form.handleSubmit((values) =>
-                  create.mutate({ ...values, description: values.description || null }),
-                )}
+                onSubmit={form.handleSubmit((values) => save.mutate(values))}
               >
-                {create.isError ? (
+                {save.isError ? (
                   <Alert variant="destructive">
                     <AlertTitle>保存失败</AlertTitle>
-                    <AlertDescription>{errorMessage(create.error)}</AlertDescription>
+                    <AlertDescription>{errorMessage(save.error)}</AlertDescription>
                   </Alert>
                 ) : null}
                 <FormField label="所属机房" htmlFor="roomId" error={form.formState.errors.roomId?.message}>
@@ -91,8 +128,8 @@ export function AreaFormPage() {
                   <Textarea id="description" placeholder="可选" {...form.register("description")} />
                 </FormField>
                 <div className="flex justify-end gap-2 border-t pt-5">
-                  <Button variant="ghost" nativeButton={false} render={<Link to="/locations" />}><ArrowLeft /> 取消</Button>
-                  <Button type="submit" disabled={create.isPending}>{create.isPending ? "正在保存…" : "保存区域"}</Button>
+                  <Button variant="ghost" nativeButton={false} render={<Link to={areaId ? `/locations/areas/${areaId}` : "/locations"} />}><ArrowLeft /> 取消</Button>
+                  <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存区域"}</Button>
                 </div>
               </form>
             </CardContent>
@@ -101,4 +138,8 @@ export function AreaFormPage() {
       </PageBody>
     </div>
   )
+}
+
+function AreaFormState({ title, message, error = false }: { title: string; message: string; error?: boolean }) {
+  return <div className="flex min-h-0 flex-1 flex-col"><PageHeader title={title} /><PageBody><p className={error ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{message}</p></PageBody></div>
 }

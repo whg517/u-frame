@@ -6,11 +6,15 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	listLocations: () => typedError<LocationTreeDto, AppErrorDto>(__TAURI_INVOKE("list_locations")),
 	createRoom: (input: CreateRoomInput) => typedError<RoomDto, AppErrorDto>(__TAURI_INVOKE("create_room", { input })),
+	updateRoom: (input: UpdateRoomInput) => typedError<RoomDto, AppErrorDto>(__TAURI_INVOKE("update_room", { input })),
 	createArea: (input: CreateAreaInput) => typedError<AreaDto, AppErrorDto>(__TAURI_INVOKE("create_area", { input })),
+	updateArea: (input: UpdateAreaInput) => typedError<AreaDto, AppErrorDto>(__TAURI_INVOKE("update_area", { input })),
 	listRacks: (areaId: string | null) => typedError<RackDto[], AppErrorDto>(__TAURI_INVOKE("list_racks", { areaId })),
 	createRack: (input: CreateRackInput) => typedError<RackDto, AppErrorDto>(__TAURI_INVOKE("create_rack", { input })),
+	updateRack: (input: UpdateRackInput) => typedError<RackDto, AppErrorDto>(__TAURI_INVOKE("update_rack", { input })),
 	listAssets: () => typedError<AssetDto[], AppErrorDto>(__TAURI_INVOKE("list_assets")),
 	createAsset: (input: CreateAssetInput) => typedError<AssetDto, AppErrorDto>(__TAURI_INVOKE("create_asset", { input })),
+	updateAsset: (input: UpdateAssetInput) => typedError<AssetDto, AppErrorDto>(__TAURI_INVOKE("update_asset", { input })),
 	placeAsset: (input: PlaceAssetInput) => typedError<PlacementDto, AppErrorDto>(__TAURI_INVOKE("place_asset", { input })),
 	getRackView: (areaId: string | null) => typedError<RackViewDto, AppErrorDto>(__TAURI_INVOKE("get_rack_view", { areaId })),
 	reorderRacks: (input: ReorderRacksInput) => typedError<ReorderRacksResultDto, AppErrorDto>(__TAURI_INVOKE("reorder_racks", { input })),
@@ -196,6 +200,47 @@ export type SeedResultDto = {
 	racks: number,
 	assets: number,
 	placements: number,
+};
+
+export type UpdateAreaInput = {
+	areaId: string,
+	roomId: string,
+	code: string,
+	name: string,
+	description: string | null,
+};
+
+export type UpdateAssetInput = {
+	assetId: string,
+	type: string,
+	name: string,
+	hostname: string | null,
+	intranetIp: string | null,
+	managementIp: string | null,
+	serialNumber: string | null,
+	vendor: string | null,
+	model: string | null,
+	purpose: string | null,
+	heightU: number,
+	status: string,
+	notes: string | null,
+};
+
+export type UpdateRackInput = {
+	rackId: string,
+	areaId: string,
+	code: string,
+	specification: string,
+	totalU: number,
+	powerCapacityW: number | null,
+	notes: string | null,
+};
+
+export type UpdateRoomInput = {
+	roomId: string,
+	code: string,
+	name: string,
+	description: string | null,
 };
 
 /* Tauri Specta runtime */

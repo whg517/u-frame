@@ -31,6 +31,7 @@ MVP 管理四类设备：
 - Tauri 2、React 19、TypeScript strict、Vite 7、pnpm、SQLite、SQLx、TanStack Query、React Hook Form、Zod、Vitest 和 ESLint 已实际采用。
 - Tauri IPC bindings 由 tauri-specta 生成并纳入门禁；应用启动时执行内嵌 SQLite migration。
 - 机柜一览已具备网格画布、缩放和机柜顺序持久化；设备拖拽上架、移动及大规模虚拟化仍未实现。
+- 机房、区域、机柜和设备已具备详情与编辑路径；机柜一览支持机房、区域的全部、多选和联动筛选。
 - CSP 已限制为本地资源与 Tauri IPC，默认 opener 权限已移除。
 - Excel 导入导出、备份恢复、完整审计和 CI 尚未接入。
 

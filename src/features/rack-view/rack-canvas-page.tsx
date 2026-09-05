@@ -12,6 +12,8 @@ import { useLocations } from "@/features/locations/queries"
 import { DeviceInspector } from "./device-inspector"
 import { CanvasZoomControls } from "./canvas-zoom-controls"
 import { CANVAS_ZOOM_STEP, clampCanvasZoom } from "./layout"
+import { filterRackCanvases, replaceFilterValues } from "./filters"
+import { MultiSelectFilter } from "./multi-select-filter"
 import { RackCanvas } from "./rack-canvas"
 import "./rack-canvas.css"
 
@@ -19,37 +21,61 @@ export function RackCanvasPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [zoom, setZoom] = useState(1)
   const queryClient = useQueryClient()
-  const areaId = searchParams.get("area") || null
+  const roomIds = searchParams.getAll("room")
+  const areaIds = searchParams.getAll("area")
   const selectedAssetId = searchParams.get("highlight") || null
   const locations = useLocations()
   const view = useQuery({
-    queryKey: queryKeys.rackView(areaId),
-    queryFn: () => tauriClient.getRackView(areaId),
+    queryKey: queryKeys.rackView(null),
+    queryFn: () => tauriClient.getRackView(),
   })
   const reorder = useMutation({
     mutationFn: (rackIds: string[]) => tauriClient.reorderRacks({ rackIds }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.rackView(areaId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
         queryClient.invalidateQueries({ queryKey: queryKeys.racksRoot }),
       ])
     },
   })
-  const areas = locations.data?.rooms.flatMap(({ room, areas }) =>
-    areas.map((area) => ({ ...area, roomName: room.name })),
-  ) ?? []
+  const rooms = locations.data?.rooms.map(({ room }) => room) ?? []
+  const areas = locations.data?.rooms.flatMap(({ room, areas }) => areas.map((area) => ({
+    ...area,
+    roomName: room.name,
+    roomCode: room.code,
+  }))) ?? []
+  const visibleAreas = roomIds.length === 0
+    ? areas
+    : areas.filter((area) => roomIds.includes(area.roomId))
+  const visibleRacks = filterRackCanvases(view.data?.racks ?? [], roomIds, areaIds)
   const selection = (() => {
-    for (const rack of view.data?.racks ?? []) {
+    for (const rack of visibleRacks) {
       const placement = rack.placements.find((item) => item.assetId === selectedAssetId)
       if (placement) return { placement, rack: rack.rack }
     }
     return null
   })()
 
-  const updateArea = (nextAreaId: string) => {
+  const updateRooms = (nextRoomIds: string[]) => {
+    let next = replaceFilterValues(searchParams, "room", nextRoomIds)
+    if (nextRoomIds.length > 0) {
+      const allowedAreaIds = new Set(areas
+        .filter((area) => nextRoomIds.includes(area.roomId))
+        .map((area) => area.id))
+      const retainedAreaIds = areaIds.filter((areaId) => allowedAreaIds.has(areaId))
+      next = replaceFilterValues(next, "area", retainedAreaIds)
+    }
+    setSearchParams(next)
+  }
+
+  const updateAreas = (nextAreaIds: string[]) => {
+    setSearchParams(replaceFilterValues(searchParams, "area", nextAreaIds))
+  }
+
+  const clearFilters = () => {
     const next = new URLSearchParams(searchParams)
-    if (nextAreaId) next.set("area", nextAreaId)
-    else next.delete("area")
+    next.delete("room")
+    next.delete("area")
     next.delete("highlight")
     setSearchParams(next)
   }
@@ -74,22 +100,22 @@ export function RackCanvasPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <label className="sr-only" htmlFor="area-filter">
-            区域
-          </label>
-          <select
-            id="area-filter"
-            value={areaId ?? ""}
-            onChange={(event) => updateArea(event.target.value)}
-            className="h-8 min-w-40 rounded-md border border-input bg-background px-2.5 text-sm"
-          >
-            <option value="">全部区域</option>
-            {areas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.roomName} / {area.name}
-              </option>
-            ))}
-          </select>
+          <MultiSelectFilter
+            label="机房"
+            allLabel="全部机房"
+            options={rooms.map((room) => ({ value: room.id, label: room.name, description: room.code }))}
+            values={roomIds}
+            onChange={updateRooms}
+            disabled={locations.isPending || locations.isError}
+          />
+          <MultiSelectFilter
+            label="区域"
+            allLabel="全部区域"
+            options={visibleAreas.map((area) => ({ value: area.id, label: area.name, description: `${area.roomName} · ${area.code}` }))}
+            values={areaIds}
+            onChange={updateAreas}
+            disabled={locations.isPending || locations.isError}
+          />
           <Button
             variant="outline"
             size="sm"
@@ -115,16 +141,16 @@ export function RackCanvasPage() {
               <div className="grid size-full place-items-center px-6 text-center">
                 <p className="text-sm text-destructive">{errorMessage(view.error)}</p>
               </div>
-            ) : view.data.racks.length === 0 ? (
+            ) : visibleRacks.length === 0 ? (
               <div className="grid size-full min-h-80 place-items-center">
                 <EmptyState
                   variant="canvas"
-                  title="当前范围没有机柜"
-                  description="创建位置和机柜后，会在这里显示正面 U 位图。"
+                  title={roomIds.length > 0 || areaIds.length > 0 ? "筛选范围没有机柜" : "当前范围没有机柜"}
+                  description={roomIds.length > 0 || areaIds.length > 0 ? "可以调整机房或区域筛选条件。" : "创建位置和机柜后，会在这里显示正面 U 位图。"}
                   action={
-                    <Button nativeButton={false} render={<Link to="/racks/new" />}>
-                      <Plus /> 创建机柜
-                    </Button>
+                    roomIds.length > 0 || areaIds.length > 0
+                      ? <Button variant="outline" onClick={clearFilters}>查看全部</Button>
+                      : <Button nativeButton={false} render={<Link to="/racks/new" />}><Plus /> 创建机柜</Button>
                   }
                 />
               </div>
@@ -138,8 +164,8 @@ export function RackCanvasPage() {
                 }}
               >
                 <RackCanvas
-                  key={view.data.racks.map(({ rack }) => rack.id).join(":")}
-                  racks={view.data.racks}
+                  key={visibleRacks.map(({ rack }) => rack.id).join(":")}
+                  racks={visibleRacks}
                   selectedAssetId={selectedAssetId}
                   isReordering={reorder.isPending}
                   onReorderRacks={(rackIds) => reorder.mutateAsync(rackIds).then(() => undefined)}

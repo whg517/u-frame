@@ -65,6 +65,10 @@ describe("RackDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "R-A01-01" })).toBeInTheDocument()
     expect(screen.getByText("40U")).toBeInTheDocument()
     expect(screen.getByText("5%")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "编辑机柜" })).toHaveAttribute(
+      "href",
+      "/racks/rack-1/edit",
+    )
     expect(screen.getByRole("link", { name: "边界防火墙" })).toHaveAttribute(
       "href",
       "/assets/asset-1",

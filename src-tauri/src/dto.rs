@@ -11,7 +11,26 @@ pub struct CreateRoomInput {
 
 #[derive(Clone, Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateRoomInput {
+    pub room_id: String,
+    pub code: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateAreaInput {
+    pub room_id: String,
+    pub code: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAreaInput {
+    pub area_id: String,
     pub room_id: String,
     pub code: String,
     pub name: String,
@@ -31,7 +50,38 @@ pub struct CreateRackInput {
 
 #[derive(Clone, Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateRackInput {
+    pub rack_id: String,
+    pub area_id: String,
+    pub code: String,
+    pub specification: String,
+    pub total_u: i32,
+    pub power_capacity_w: Option<i32>,
+    pub notes: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateAssetInput {
+    #[serde(rename = "type")]
+    pub asset_type: String,
+    pub name: String,
+    pub hostname: Option<String>,
+    pub intranet_ip: Option<String>,
+    pub management_ip: Option<String>,
+    pub serial_number: Option<String>,
+    pub vendor: Option<String>,
+    pub model: Option<String>,
+    pub purpose: Option<String>,
+    pub height_u: i32,
+    pub status: String,
+    pub notes: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAssetInput {
+    pub asset_id: String,
     #[serde(rename = "type")]
     pub asset_type: String,
     pub name: String,

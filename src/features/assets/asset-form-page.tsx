@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { Link, useNavigate } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -15,6 +16,7 @@ import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
+import { useAssets } from "./queries"
 
 const optionalIp = z.string().refine((value) => {
   if (!value.trim()) return true
@@ -40,8 +42,12 @@ type FormData = z.infer<typeof schema>
 const nullable = (value: string) => value.trim() || null
 
 export function AssetFormPage() {
+  const { assetId } = useParams()
+  const isEditing = Boolean(assetId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const assets = useAssets()
+  const asset = assets.data?.find((item) => item.id === assetId)
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -50,26 +56,62 @@ export function AssetFormPage() {
       status: "active", notes: "",
     },
   })
-  const create = useMutation({
-    mutationFn: tauriClient.createAsset,
+  useEffect(() => {
+    if (!asset) return
+    form.reset({
+      type: asset.type as FormData["type"],
+      name: asset.name,
+      hostname: asset.hostname ?? "",
+      intranetIp: asset.intranetIp ?? "",
+      managementIp: asset.managementIp ?? "",
+      serialNumber: asset.serialNumber ?? "",
+      vendor: asset.vendor ?? "",
+      model: asset.model ?? "",
+      purpose: asset.purpose ?? "",
+      heightU: asset.heightU,
+      status: asset.status as FormData["status"],
+      notes: asset.notes ?? "",
+    })
+  }, [asset, form])
+  const save = useMutation({
+    mutationFn: (value: FormData) => {
+      const input = {
+        type: value.type, name: value.name, hostname: nullable(value.hostname), intranetIp: nullable(value.intranetIp),
+        managementIp: nullable(value.managementIp), serialNumber: nullable(value.serialNumber), vendor: nullable(value.vendor),
+        model: nullable(value.model), purpose: nullable(value.purpose), heightU: value.heightU, status: value.status, notes: nullable(value.notes),
+      }
+      return assetId
+        ? tauriClient.updateAsset({ assetId, ...input })
+        : tauriClient.createAsset(input)
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.assets })
-      navigate("/assets")
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
+      ])
+      navigate(assetId ? `/assets/${assetId}` : "/assets")
     },
   })
 
+  if (isEditing && assets.isPending) {
+    return <AssetFormState title="编辑设备" message="正在读取设备…" />
+  }
+  if (isEditing && (assets.isError || !asset)) {
+    return <AssetFormState title="编辑设备" message={assets.isError ? errorMessage(assets.error) : "没有找到这个设备。"} error />
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader eyebrow="Physical assets" title="新建设备" description="设备可以暂不上架，物理位置由上架记录统一维护。" />
+      <PageHeader
+        eyebrow="Physical assets"
+        title={isEditing ? "编辑设备" : "新建设备"}
+        description={isEditing ? "修改设备台账字段；已上架设备调整高度时会重新校验 U 位。" : "设备可以暂不上架，物理位置由上架记录统一维护。"}
+      />
       <PageBody>
         <Card className="mx-auto max-w-3xl">
           <CardContent>
-            <form className="space-y-5" onSubmit={form.handleSubmit((value) => create.mutate({
-              type: value.type, name: value.name, hostname: nullable(value.hostname), intranetIp: nullable(value.intranetIp),
-              managementIp: nullable(value.managementIp), serialNumber: nullable(value.serialNumber), vendor: nullable(value.vendor),
-              model: nullable(value.model), purpose: nullable(value.purpose), heightU: value.heightU, status: value.status, notes: nullable(value.notes),
-            }))}>
-              {create.isError ? <Alert variant="destructive"><AlertTitle>保存失败</AlertTitle><AlertDescription>{errorMessage(create.error)}</AlertDescription></Alert> : null}
+            <form className="space-y-5" onSubmit={form.handleSubmit((value) => save.mutate(value))}>
+              {save.isError ? <Alert variant="destructive"><AlertTitle>保存失败</AlertTitle><AlertDescription>{errorMessage(save.error)}</AlertDescription></Alert> : null}
               <div className="grid gap-5 sm:grid-cols-2">
                 <FormField label="设备类型" htmlFor="type">
                   <select id="type" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" {...form.register("type")}>
@@ -97,8 +139,8 @@ export function AssetFormPage() {
               <FormField label="用途" htmlFor="purpose"><Input id="purpose" {...form.register("purpose")} /></FormField>
               <FormField label="备注" htmlFor="notes"><Textarea id="notes" {...form.register("notes")} /></FormField>
               <div className="flex justify-end gap-2 border-t pt-5">
-                <Button variant="ghost" nativeButton={false} render={<Link to="/assets" />}><ArrowLeft /> 取消</Button>
-                <Button type="submit" disabled={create.isPending}>{create.isPending ? "正在保存…" : "保存设备"}</Button>
+                <Button variant="ghost" nativeButton={false} render={<Link to={assetId ? `/assets/${assetId}` : "/assets"} />}><ArrowLeft /> 取消</Button>
+                <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存设备"}</Button>
               </div>
             </form>
           </CardContent>
@@ -106,4 +148,8 @@ export function AssetFormPage() {
       </PageBody>
     </div>
   )
+}
+
+function AssetFormState({ title, message, error = false }: { title: string; message: string; error?: boolean }) {
+  return <div className="flex min-h-0 flex-1 flex-col"><PageHeader title={title} /><PageBody><p className={error ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{message}</p></PageBody></div>
 }

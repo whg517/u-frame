@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus } from "lucide-react"
 import { useEffect } from "react"
 import { useForm, useWatch } from "react-hook-form"
-import { Link, useNavigate } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -17,6 +17,8 @@ import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useLocations } from "@/features/locations/queries"
+import { queryKeys } from "@/shared/lib/query-keys"
+import { useRacks } from "./queries"
 
 const rackSizes = [18, 22, 27, 32, 37, 42, 45, 47]
 const schema = z.object({
@@ -30,7 +32,11 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function RackFormPage() {
+  const { rackId } = useParams()
+  const isEditing = Boolean(rackId)
   const locations = useLocations()
+  const racks = useRacks()
+  const rack = racks.data?.find((item) => item.id === rackId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const form = useForm<FormData>({
@@ -39,35 +45,67 @@ export function RackFormPage() {
   })
   const specification = useWatch({ control: form.control, name: "specification" })
   useEffect(() => {
+    if (!rack) return
+    form.reset({
+      areaId: rack.areaId,
+      code: rack.code,
+      specification: rack.specification,
+      totalU: rack.totalU,
+      powerCapacityW: rack.powerCapacityW ?? undefined,
+      notes: rack.notes ?? "",
+    })
+  }, [form, rack])
+  useEffect(() => {
     if (specification !== "custom") {
       form.setValue("totalU", Number.parseInt(specification, 10), { shouldValidate: true })
     }
   }, [form, specification])
-  const create = useMutation({
-    mutationFn: tauriClient.createRack,
+  const save = useMutation({
+    mutationFn: (values: FormData) => {
+      const input = {
+        ...values,
+        powerCapacityW: values.powerCapacityW ?? null,
+        notes: values.notes || null,
+      }
+      return rackId
+        ? tauriClient.updateRack({ rackId, ...input })
+        : tauriClient.createRack(input)
+    },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["racks"] }),
-        queryClient.invalidateQueries({ queryKey: ["rack-view"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.racksRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
       ])
-      navigate("/racks")
+      navigate(rackId ? `/racks/${rackId}` : "/racks")
     },
   })
   const areas = locations.data?.rooms.flatMap(({ room, areas }) =>
     areas.map((area) => ({ ...area, roomName: room.name })),
   ) ?? []
 
+  if (isEditing && (locations.isPending || racks.isPending)) {
+    return <RackFormState title="编辑机柜" message="正在读取机柜…" />
+  }
+  if (isEditing && (locations.isError || racks.isError || !rack)) {
+    return <RackFormState title="编辑机柜" message={locations.isError ? errorMessage(locations.error) : racks.isError ? errorMessage(racks.error) : "没有找到这个机柜。"} error />
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader eyebrow="Rack inventory" title="新建机柜" description="选择标准规格或输入自定义 U 数。" />
+      <PageHeader
+        eyebrow="Rack inventory"
+        title={isEditing ? "编辑机柜" : "新建机柜"}
+        description={isEditing ? "修改位置、编码、规格、功率和备注。" : "选择标准规格或输入自定义 U 数。"}
+      />
       <PageBody>
         {locations.isSuccess && areas.length === 0 ? (
           <EmptyState title="请先创建区域" description="机柜必须属于一个活动区域。" action={<Button nativeButton={false} render={<Link to="/locations/areas/new" />}><Plus /> 新建区域</Button>} />
         ) : (
           <Card className="mx-auto max-w-2xl">
             <CardContent>
-              <form className="space-y-5" onSubmit={form.handleSubmit((values) => create.mutate({ ...values, powerCapacityW: values.powerCapacityW ?? null, notes: values.notes || null }))}>
-                {create.isError ? <Alert variant="destructive"><AlertTitle>保存失败</AlertTitle><AlertDescription>{errorMessage(create.error)}</AlertDescription></Alert> : null}
+              <form className="space-y-5" onSubmit={form.handleSubmit((values) => save.mutate(values))}>
+                {save.isError ? <Alert variant="destructive"><AlertTitle>保存失败</AlertTitle><AlertDescription>{errorMessage(save.error)}</AlertDescription></Alert> : null}
                 <FormField label="所属区域" htmlFor="areaId" error={form.formState.errors.areaId?.message}>
                   <select id="areaId" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" {...form.register("areaId")}>
                     <option value="">请选择区域</option>
@@ -95,8 +133,8 @@ export function RackFormPage() {
                 </div>
                 <FormField label="备注" htmlFor="notes"><Textarea id="notes" placeholder="可选" {...form.register("notes")} /></FormField>
                 <div className="flex justify-end gap-2 border-t pt-5">
-                  <Button variant="ghost" nativeButton={false} render={<Link to="/racks" />}><ArrowLeft /> 取消</Button>
-                  <Button type="submit" disabled={create.isPending}>{create.isPending ? "正在保存…" : "保存机柜"}</Button>
+                  <Button variant="ghost" nativeButton={false} render={<Link to={rackId ? `/racks/${rackId}` : "/racks"} />}><ArrowLeft /> 取消</Button>
+                  <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存机柜"}</Button>
                 </div>
               </form>
             </CardContent>
@@ -105,4 +143,8 @@ export function RackFormPage() {
       </PageBody>
     </div>
   )
+}
+
+function RackFormState({ title, message, error = false }: { title: string; message: string; error?: boolean }) {
+  return <div className="flex min-h-0 flex-1 flex-col"><PageHeader title={title} /><PageBody><p className={error ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{message}</p></PageBody></div>
 }

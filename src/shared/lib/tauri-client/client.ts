@@ -7,6 +7,10 @@ import {
   type CreateRoomInput,
   type PlaceAssetInput,
   type ReorderRacksInput,
+  type UpdateAreaInput,
+  type UpdateAssetInput,
+  type UpdateRackInput,
+  type UpdateRoomInput,
 } from "./bindings"
 
 type CommandResult<T> =
@@ -38,12 +42,16 @@ async function unwrap<T>(result: Promise<CommandResult<T>>): Promise<T> {
 export const tauriClient = {
   listLocations: () => unwrap(commands.listLocations()),
   createRoom: (input: CreateRoomInput) => unwrap(commands.createRoom(input)),
+  updateRoom: (input: UpdateRoomInput) => unwrap(commands.updateRoom(input)),
   createArea: (input: CreateAreaInput) => unwrap(commands.createArea(input)),
+  updateArea: (input: UpdateAreaInput) => unwrap(commands.updateArea(input)),
   listRacks: (areaId: string | null = null) =>
     unwrap(commands.listRacks(areaId)),
   createRack: (input: CreateRackInput) => unwrap(commands.createRack(input)),
+  updateRack: (input: UpdateRackInput) => unwrap(commands.updateRack(input)),
   listAssets: () => unwrap(commands.listAssets()),
   createAsset: (input: CreateAssetInput) => unwrap(commands.createAsset(input)),
+  updateAsset: (input: UpdateAssetInput) => unwrap(commands.updateAsset(input)),
   placeAsset: (input: PlaceAssetInput) => unwrap(commands.placeAsset(input)),
   getRackView: (areaId: string | null = null) =>
     unwrap(commands.getRackView(areaId)),

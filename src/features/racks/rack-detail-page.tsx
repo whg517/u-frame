@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Boxes, LocateFixed } from "lucide-react"
+import { ArrowLeft, Boxes, LocateFixed, Pencil } from "lucide-react"
 import { Link, useParams } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
@@ -47,6 +47,9 @@ export function RackDetailPage() {
         actions={
           <>
             <BackToRacks />
+            <Button variant="outline" nativeButton={false} render={<Link to={`/racks/${rack.id}/edit`} />}>
+              <Pencil /> 编辑机柜
+            </Button>
             <Button nativeButton={false} render={<Link to={`/?area=${rack.areaId}`} />}>
               <LocateFixed /> 在画布中查看
             </Button>

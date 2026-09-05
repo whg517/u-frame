@@ -54,6 +54,10 @@ describe("AssetDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "应用服务器 01" })).toBeInTheDocument()
     expect(screen.getByText("10.0.9.21")).toBeInTheDocument()
     expect(screen.getByText("U10–U11")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "编辑设备" })).toHaveAttribute(
+      "href",
+      "/assets/asset-1/edit",
+    )
     expect(screen.getByRole("link", { name: "R-A01-01" })).toHaveAttribute(
       "href",
       "/racks/rack-1",

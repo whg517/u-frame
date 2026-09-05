@@ -93,6 +93,8 @@ impl AppErrorDto {
             ("Placement.Overlap", "目标 U 位已被占用")
         } else if text.contains("Placement.OutOfRange") {
             ("Placement.OutOfRange", "目标 U 位超出机柜范围")
+        } else if text.contains("Rack.HeightOccupied") {
+            ("Rack.HeightOccupied", "机柜缩容会使现有设备超出 U 位范围")
         } else {
             ("Database.OperationFailed", "数据库操作失败")
         };
