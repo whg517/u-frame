@@ -1,5 +1,7 @@
 import type { ReactNode } from "react"
 
+export const workspaceHeaderHeightClass = "h-24"
+
 export function PageHeader({
   title,
   description,
@@ -10,7 +12,7 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <header className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5 lg:px-8">
+    <header className={`${workspaceHeaderHeightClass} flex shrink-0 flex-wrap items-center justify-between gap-4 border-b px-6 lg:px-8`}>
       <div className="space-y-1">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {description ? (

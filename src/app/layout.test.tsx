@@ -24,10 +24,12 @@ describe("AppLayout", () => {
 
     const shell = container.querySelector('[data-slot="sidebar-wrapper"]')
     const sidebar = container.querySelector('[data-slot="sidebar"]')
+    const sidebarHeader = container.querySelector('[data-slot="sidebar-header"]')
     const workspace = screen.getByRole("main")
 
     expect(shell).toHaveClass("h-dvh", "overflow-hidden")
     expect(sidebar).toHaveClass("h-dvh", "shrink-0")
+    expect(sidebarHeader).toHaveClass("h-24", "shrink-0")
     expect(workspace).toHaveClass("h-dvh", "overflow-hidden")
     expect(screen.getByText("画布内容")).toBeInTheDocument()
   })

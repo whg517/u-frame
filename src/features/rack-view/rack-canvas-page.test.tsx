@@ -48,6 +48,7 @@ describe("RackCanvasPage location filters", () => {
       </QueryClientProvider>,
     )
 
+    expect(screen.getByRole("banner")).toHaveClass("h-24", "shrink-0")
     expect(await screen.findByRole("button", { name: "创建机柜" })).toHaveAttribute(
       "href",
       "/racks/new?areaId=area-a&returnTo=%2F",

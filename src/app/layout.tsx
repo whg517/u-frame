@@ -25,6 +25,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { workspaceHeaderHeightClass } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 
@@ -48,7 +49,7 @@ export function AppLayout() {
   return (
     <SidebarProvider defaultOpen className="h-dvh min-h-0 overflow-hidden">
       <Sidebar collapsible="none" className="h-dvh min-h-0 shrink-0 border-r">
-        <SidebarHeader className="border-b px-4 py-4">
+        <SidebarHeader className={`${workspaceHeaderHeightClass} shrink-0 justify-center border-b px-4 py-0`}>
           <div className="flex items-center gap-3">
             <div className="grid size-8 place-items-center rounded-md bg-foreground text-xs font-semibold text-background">
               UF

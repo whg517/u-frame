@@ -4,6 +4,7 @@ import { useState, type CSSProperties, type WheelEvent } from "react"
 import { Link, useLocation, useSearchParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
+import { workspaceHeaderHeightClass } from "@/shared/components/page"
 import { EmptyState } from "@/shared/components/empty-state"
 import { errorMessage } from "@/shared/lib/errors"
 import { queryKeys } from "@/shared/lib/query-keys"
@@ -105,7 +106,7 @@ export function RackCanvasPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="flex h-16 shrink-0 items-center justify-between gap-6 border-b px-5 lg:px-6">
+      <header className={`${workspaceHeaderHeightClass} flex shrink-0 items-center justify-between gap-6 border-b px-5 lg:px-6`}>
         <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="shrink-0 text-lg font-semibold tracking-tight">机柜一览</h1>
           <p className="hidden truncate text-xs text-muted-foreground lg:block">
