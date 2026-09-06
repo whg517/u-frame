@@ -1,21 +1,25 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, Boxes, LocateFixed, Pencil } from "lucide-react"
-import { Link, useParams } from "react-router"
+import { ArrowLeft, Boxes, LocateFixed, Pencil, Plus, Server } from "lucide-react"
+import { Link, useLocation, useParams, useSearchParams } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DetailList, DetailMetric } from "@/shared/components/detail-list"
 import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { assetStatusLabels, assetTypeLabels } from "@/shared/lib/asset-labels"
 import { errorMessage } from "@/shared/lib/errors"
+import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 
 export function RackDetailPage() {
   const { rackId = "" } = useParams()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), "/racks")
   const view = useQuery({
     queryKey: queryKeys.rackView(null),
     queryFn: () => tauriClient.getRackView(),
@@ -27,8 +31,8 @@ export function RackDetailPage() {
   if (!canvas) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <PageHeader title="机柜详情" actions={<BackToRacks />} />
-        <PageBody><EmptyState title="没有找到这个机柜" description="机柜可能已归档，或者链接中的标识无效。" action={<BackToRacks />} /></PageBody>
+        <PageHeader title="机柜详情" actions={<BackToRacks to={returnTo} />} />
+        <PageBody><EmptyState title="没有找到这个机柜" description="机柜可能已归档，或者链接中的标识无效。" action={<BackToRacks to={returnTo} />} /></PageBody>
       </div>
     )
   }
@@ -37,6 +41,13 @@ export function RackDetailPage() {
   const occupiedU = placements.reduce((sum, placement) => sum + placement.heightU, 0)
   const availableU = rack.totalU - occupiedU
   const occupancy = Math.round((occupiedU / rack.totalU) * 100)
+  const origin = currentRoute(location.pathname, location.search)
+  const addNewAssetPath = routeWithParams("/assets/new", { rackId: rack.id, returnTo: origin })
+  const addExistingAssetPath = routeWithParams("/assets", {
+    placement: "unplaced",
+    rackId: rack.id,
+    returnTo: origin,
+  })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -46,7 +57,7 @@ export function RackDetailPage() {
         description={`${rack.roomName} / ${rack.areaName}`}
         actions={
           <>
-            <BackToRacks />
+            <BackToRacks to={returnTo} />
             <Button variant="outline" nativeButton={false} render={<Link to={`/racks/${rack.id}/edit`} />}>
               <Pencil /> 编辑机柜
             </Button>
@@ -80,7 +91,17 @@ export function RackDetailPage() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2"><Boxes className="size-4" /> 已上架设备</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Boxes className="size-4" /> 已上架设备</CardTitle>
+                <CardAction className="flex gap-2">
+                  <Button size="sm" variant="outline" nativeButton={false} render={<Link to={addExistingAssetPath} />}>
+                    <Server /> 选择已有
+                  </Button>
+                  <Button size="sm" nativeButton={false} render={<Link to={addNewAssetPath} />}>
+                    <Plus /> 新建设备
+                  </Button>
+                </CardAction>
+              </CardHeader>
               <CardContent className="p-0">
                 {placements.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-muted-foreground">该机柜当前没有设备。</p>
@@ -108,8 +129,8 @@ export function RackDetailPage() {
   )
 }
 
-function BackToRacks() {
-  return <Button variant="outline" nativeButton={false} render={<Link to="/racks" />}><ArrowLeft /> 返回机柜列表</Button>
+function BackToRacks({ to = "/racks" }: { to?: string }) {
+  return <Button variant="outline" nativeButton={false} render={<Link to={to} />}><ArrowLeft /> 返回</Button>
 }
 
 function RackDetailState({ title, message, error = false }: { title: string; message: string; error?: boolean }) {

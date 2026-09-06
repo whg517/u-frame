@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, ChevronRight, MapPin, Pencil } from "lucide-react"
-import { Link, useParams } from "react-router"
+import { ArrowLeft, ChevronRight, LocateFixed, MapPin, Pencil, Plus } from "lucide-react"
+import { Link, useLocation, useParams, useSearchParams } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,14 +9,15 @@ import { DetailList, DetailMetric } from "@/shared/components/detail-list"
 import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
+import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useLocations } from "./queries"
 
-function BackToLocations() {
+function BackToLocations({ to = "/locations", label = "返回" }: { to?: string; label?: string }) {
   return (
-    <Button variant="outline" nativeButton={false} render={<Link to="/locations" />}>
-      <ArrowLeft /> 返回位置列表
+    <Button variant="outline" nativeButton={false} render={<Link to={to} />}>
+      <ArrowLeft /> {label}
     </Button>
   )
 }
@@ -38,6 +39,8 @@ function LocationNotFound({ title }: { title: string }) {
 
 export function RoomDetailPage() {
   const { roomId = "" } = useParams()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const locations = useLocations()
   const racks = useQuery({
     queryKey: queryKeys.racksRoot,
@@ -54,6 +57,8 @@ export function RoomDetailPage() {
   const node = locations.data.rooms.find(({ room }) => room.id === roomId)
   if (!node) return <LocationNotFound title="机房详情" />
   const roomRacks = racks.data.filter((rack) => rack.roomId === roomId)
+  const origin = currentRoute(location.pathname, location.search)
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), "/locations")
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -63,7 +68,13 @@ export function RoomDetailPage() {
         description={`机房编码 ${node.room.code}`}
         actions={
           <>
-            <BackToLocations />
+            <BackToLocations to={returnTo} />
+            <Button variant="outline" nativeButton={false} render={<Link to={routeWithParams("/locations/areas/new", { roomId: node.room.id, returnTo: origin })} />}>
+              <Plus /> 新增区域
+            </Button>
+            <Button variant="outline" nativeButton={false} render={<Link to={`/?room=${encodeURIComponent(node.room.id)}`} />}>
+              <LocateFixed /> 查看机柜
+            </Button>
             <Button nativeButton={false} render={<Link to={`/locations/rooms/${node.room.id}/edit`} />}>
               <Pencil /> 编辑机房
             </Button>
@@ -98,7 +109,7 @@ export function RoomDetailPage() {
                     <li key={area.id}>
                       <Link
                         className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/50"
-                        to={`/locations/areas/${area.id}`}
+                        to={routeWithParams(`/locations/areas/${area.id}`, { returnTo: origin })}
                       >
                         <span className="flex min-w-0 items-center gap-3">
                           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted">
@@ -125,6 +136,8 @@ export function RoomDetailPage() {
 
 export function AreaDetailPage() {
   const { areaId = "" } = useParams()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const locations = useLocations()
   const racks = useQuery({
     queryKey: queryKeys.racks(areaId),
@@ -140,6 +153,8 @@ export function AreaDetailPage() {
   const area = roomNode?.areas.find((item) => item.id === areaId)
   if (!roomNode || !area) return <LocationNotFound title="区域详情" />
   const totalU = racks.data.reduce((sum, rack) => sum + rack.totalU, 0)
+  const origin = currentRoute(location.pathname, location.search)
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), "/locations")
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -149,7 +164,13 @@ export function AreaDetailPage() {
         description={`${roomNode.room.name} / ${area.code}`}
         actions={
           <>
-            <BackToLocations />
+            <BackToLocations to={returnTo} />
+            <Button variant="outline" nativeButton={false} render={<Link to={routeWithParams("/racks/new", { areaId: area.id, returnTo: origin })} />}>
+              <Plus /> 新增机柜
+            </Button>
+            <Button variant="outline" nativeButton={false} render={<Link to={`/?area=${encodeURIComponent(area.id)}`} />}>
+              <LocateFixed /> 查看画布
+            </Button>
             <Button nativeButton={false} render={<Link to={`/locations/areas/${area.id}/edit`} />}>
               <Pencil /> 编辑区域
             </Button>
@@ -183,7 +204,7 @@ export function AreaDetailPage() {
                 <ul className="divide-y">
                   {racks.data.map((rack) => (
                     <li key={rack.id}>
-                      <Link className="flex items-center justify-between px-4 py-3 hover:bg-muted/50" to={`/racks/${rack.id}`}>
+                      <Link className="flex items-center justify-between px-4 py-3 hover:bg-muted/50" to={routeWithParams(`/racks/${rack.id}`, { returnTo: origin })}>
                         <span>
                           <span className="block font-mono font-medium">{rack.code}</span>
                           <span className="text-xs text-muted-foreground">

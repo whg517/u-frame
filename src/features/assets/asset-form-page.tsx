@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { Link, useNavigate, useParams } from "react-router"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { FormField } from "@/shared/components/form-field"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
+import { routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useAssets } from "./queries"
@@ -43,11 +44,14 @@ const nullable = (value: string) => value.trim() || null
 
 export function AssetFormPage() {
   const { assetId } = useParams()
+  const [searchParams] = useSearchParams()
   const isEditing = Boolean(assetId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const assets = useAssets()
   const asset = assets.data?.find((item) => item.id === assetId)
+  const rackId = searchParams.get("rackId")
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), assetId ? `/assets/${assetId}` : "/assets")
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -84,12 +88,16 @@ export function AssetFormPage() {
         ? tauriClient.updateAsset({ assetId, ...input })
         : tauriClient.createAsset(input)
     },
-    onSuccess: async () => {
+    onSuccess: async (savedAsset) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
         queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
       ])
-      navigate(assetId ? `/assets/${assetId}` : "/assets")
+      if (!assetId && rackId) {
+        navigate(routeWithParams(`/assets/${savedAsset.id}/place`, { rackId, returnTo }))
+        return
+      }
+      navigate(returnTo)
     },
   })
 
@@ -139,7 +147,7 @@ export function AssetFormPage() {
               <FormField label="用途" htmlFor="purpose"><Input id="purpose" {...form.register("purpose")} /></FormField>
               <FormField label="备注" htmlFor="notes"><Textarea id="notes" {...form.register("notes")} /></FormField>
               <div className="flex justify-end gap-2 border-t pt-5">
-                <Button variant="ghost" nativeButton={false} render={<Link to={assetId ? `/assets/${assetId}` : "/assets"} />}><ArrowLeft /> 取消</Button>
+                <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> 取消</Button>
                 <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存设备"}</Button>
               </div>
             </form>

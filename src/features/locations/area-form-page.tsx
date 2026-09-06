@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus } from "lucide-react"
 import { useEffect, useMemo } from "react"
 import { useForm } from "react-hook-form"
-import { Link, useNavigate, useParams } from "react-router"
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -15,6 +15,7 @@ import { EmptyState } from "@/shared/components/empty-state"
 import { FormField } from "@/shared/components/form-field"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
+import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useLocations } from "./queries"
@@ -29,14 +30,19 @@ type FormData = z.infer<typeof schema>
 
 export function AreaFormPage() {
   const { areaId } = useParams()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
   const isEditing = Boolean(areaId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const locations = useLocations()
+  const requestedRoomId = searchParams.get("roomId")
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { roomId: "", code: "", name: "", description: "" },
+    defaultValues: { roomId: requestedRoomId ?? "", code: "", name: "", description: "" },
   })
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), areaId ? `/locations/areas/${areaId}` : "/locations")
+  const origin = currentRoute(location.pathname, location.search)
   const existing = useMemo(
     () => locations.data?.rooms
       .flatMap(({ room, areas }) => areas.map((area) => ({ area, room })))
@@ -52,6 +58,14 @@ export function AreaFormPage() {
       description: existing.area.description ?? "",
     })
   }, [existing, form])
+  useEffect(() => {
+    if (
+      isEditing
+      || !requestedRoomId
+      || !locations.data?.rooms.some(({ room }) => room.id === requestedRoomId)
+    ) return
+    form.setValue("roomId", requestedRoomId, { shouldValidate: true })
+  }, [form, isEditing, locations.data, requestedRoomId])
   const save = useMutation({
     mutationFn: (values: FormData) => {
       const input = { ...values, description: values.description || null }
@@ -59,14 +73,16 @@ export function AreaFormPage() {
         ? tauriClient.updateArea({ areaId, ...input })
         : tauriClient.createArea(input)
     },
-    onSuccess: async () => {
+    onSuccess: async (savedArea) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.locations }),
         queryClient.invalidateQueries({ queryKey: queryKeys.racksRoot }),
         queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
         queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
       ])
-      navigate(areaId ? `/locations/areas/${areaId}` : "/locations")
+      navigate(!isEditing && returnTo.startsWith("/racks/new")
+        ? routeWithParams(returnTo, { areaId: savedArea.id })
+        : returnTo)
     },
   })
 
@@ -89,7 +105,7 @@ export function AreaFormPage() {
           <EmptyState
             title="请先创建机房"
             description="区域必须属于一个活动机房。"
-            action={<Button nativeButton={false} render={<Link to="/locations/rooms/new" />}><Plus /> 新建机房</Button>}
+            action={<Button nativeButton={false} render={<Link to={routeWithParams("/locations/rooms/new", { returnTo: origin })} />}><Plus /> 新建机房</Button>}
           />
         ) : (
           <Card className="mx-auto max-w-2xl">
@@ -128,7 +144,7 @@ export function AreaFormPage() {
                   <Textarea id="description" placeholder="可选" {...form.register("description")} />
                 </FormField>
                 <div className="flex justify-end gap-2 border-t pt-5">
-                  <Button variant="ghost" nativeButton={false} render={<Link to={areaId ? `/locations/areas/${areaId}` : "/locations"} />}><ArrowLeft /> 取消</Button>
+                  <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> 取消</Button>
                   <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存区域"}</Button>
                 </div>
               </form>

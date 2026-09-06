@@ -5,12 +5,14 @@ import {
   type CreateAssetInput,
   type CreateRackInput,
   type CreateRoomInput,
+  type MoveAssetInput,
   type PlaceAssetInput,
   type ReorderRacksInput,
   type UpdateAreaInput,
   type UpdateAssetInput,
   type UpdateRackInput,
   type UpdateRoomInput,
+  type UnplaceAssetInput,
 } from "./bindings"
 
 type CommandResult<T> =
@@ -53,6 +55,8 @@ export const tauriClient = {
   createAsset: (input: CreateAssetInput) => unwrap(commands.createAsset(input)),
   updateAsset: (input: UpdateAssetInput) => unwrap(commands.updateAsset(input)),
   placeAsset: (input: PlaceAssetInput) => unwrap(commands.placeAsset(input)),
+  moveAsset: (input: MoveAssetInput) => unwrap(commands.moveAsset(input)),
+  unplaceAsset: (input: UnplaceAssetInput) => unwrap(commands.unplaceAsset(input)),
   getRackView: (areaId: string | null = null) =>
     unwrap(commands.getRackView(areaId)),
   reorderRacks: (input: ReorderRacksInput) => unwrap(commands.reorderRacks(input)),

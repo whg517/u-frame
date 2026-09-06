@@ -75,7 +75,7 @@ describe("location details", () => {
     )
     expect(screen.getByRole("link", { name: /网络区/ })).toHaveAttribute(
       "href",
-      "/locations/areas/area-1",
+      "/locations/areas/area-1?returnTo=%2Flocations%2Frooms%2Froom-1",
     )
   })
 
@@ -93,7 +93,7 @@ describe("location details", () => {
     )
     expect(screen.getByRole("link", { name: /R-A01-01/ })).toHaveAttribute(
       "href",
-      "/racks/rack-1",
+      "/racks/rack-1?returnTo=%2Flocations%2Fareas%2Farea-1",
     )
   })
 })

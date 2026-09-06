@@ -107,6 +107,20 @@ pub struct PlaceAssetInput {
 
 #[derive(Clone, Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct MoveAssetInput {
+    pub asset_id: String,
+    pub rack_id: String,
+    pub start_u: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UnplaceAssetInput {
+    pub asset_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct ReorderRacksInput {
     pub rack_ids: Vec<String>,
 }
@@ -205,6 +219,14 @@ pub struct PlacementDto {
     pub end_u: i32,
     pub height_u: i32,
     pub placed_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UnplaceAssetResultDto {
+    pub asset_id: String,
+    pub placement_id: String,
+    pub removed_at: String,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]

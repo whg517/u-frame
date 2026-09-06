@@ -1,5 +1,5 @@
 import { Eye, Plus } from "lucide-react"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { useRacks } from "./queries"
 
 export function RacksPage() {
   const racks = useRacks()
+  const navigate = useNavigate()
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
@@ -46,13 +47,22 @@ export function RacksPage() {
               </TableHeader>
               <TableBody>
                 {racks.data.map((rack) => (
-                  <TableRow key={rack.id}>
+                  <TableRow
+                    key={rack.id}
+                    className="cursor-pointer"
+                    tabIndex={0}
+                    aria-label={`查看机柜 ${rack.code}`}
+                    onClick={() => navigate(`/racks/${rack.id}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") navigate(`/racks/${rack.id}`)
+                    }}
+                  >
                     <TableCell className="font-mono font-medium">{rack.code}</TableCell>
                     <TableCell>{rack.specification === "custom" ? `${rack.totalU}U 自定义` : rack.specification}</TableCell>
                     <TableCell>{rack.roomName} / {rack.areaName}</TableCell>
                     <TableCell>{rack.powerCapacityW ? `${rack.powerCapacityW} W` : "—"}</TableCell>
                     <TableCell><Badge variant="outline">活动</Badge></TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                       <Button size="sm" variant="ghost" nativeButton={false} render={<Link to={`/racks/${rack.id}`} />}>
                         <Eye /> 查看
                       </Button>

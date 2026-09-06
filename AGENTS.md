@@ -30,8 +30,10 @@ MVP 管理四类设备：
 - Iteration 001 已交付创建位置、机柜、设备、设备上架与多机柜查看的行走骨架。
 - Tauri 2、React 19、TypeScript strict、Vite 7、pnpm、SQLite、SQLx、TanStack Query、React Hook Form、Zod、Vitest 和 ESLint 已实际采用。
 - Tauri IPC bindings 由 tauri-specta 生成并纳入门禁；应用启动时执行内嵌 SQLite migration。
-- 机柜一览已具备网格画布、缩放和机柜顺序持久化；设备拖拽上架、移动及大规模虚拟化仍未实现。
+- 机柜一览已具备网格画布、缩放和机柜顺序持久化；设备上架和移动使用表单，不实现设备拖拽，大规模虚拟化仍未实现。
 - 机房、区域、机柜和设备已具备详情与编辑路径；机柜一览支持机房、区域的全部、多选和联动筛选。
+- Iteration 005 已将画布、详情、列表和表单组成连续任务：支持安全返回原上下文、已知父级预选、详情后续动作、整行导航和 URL 搜索筛选。
+- 设备已支持原子移动和保留历史放置行的下架；上架/移动页可查看连续空闲 U 位和具体冲突对象。
 - CSP 已限制为本地资源与 Tauri IPC，默认 opener 权限已移除。
 - Excel 导入导出、备份恢复、完整审计和 CI 尚未接入。
 
@@ -78,7 +80,7 @@ MVP 管理四类设备：
 ```text
 .
 ├── docs/
-├── src/                 # React 前端，当前仍为示例结构
+├── src/                 # React 前端，按 app / features / shared 分层
 ├── src-tauri/           # Rust/Tauri 应用
 ├── package.json
 ├── pnpm-lock.yaml
@@ -298,7 +300,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-当前没有 `lint` 或前端 `test` script。建立对应配置之前，不得运行不存在的命令或声称这些检查已经通过。
+`pnpm gate` 已组合文档、bindings 漂移、ESLint、TypeScript、Vitest、前端构建、Rust format、Debug/Release Clippy 和 Rust 全量测试；不得绕过其中任何一项。
 
 仅修改 Markdown 时不要求重复执行应用构建，但必须检查：
 

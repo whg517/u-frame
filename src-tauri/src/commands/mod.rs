@@ -4,9 +4,9 @@ use crate::{
     application,
     dto::{
         AreaDto, AssetDto, CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput,
-        LocationTreeDto, PlaceAssetInput, PlacementDto, RackDto, RackViewDto, ReorderRacksInput,
-        ReorderRacksResultDto, RoomDto, UpdateAreaInput, UpdateAssetInput, UpdateRackInput,
-        UpdateRoomInput,
+        LocationTreeDto, MoveAssetInput, PlaceAssetInput, PlacementDto, RackDto, RackViewDto,
+        ReorderRacksInput, ReorderRacksResultDto, RoomDto, UnplaceAssetInput,
+        UnplaceAssetResultDto, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
     },
     error::{AppErrorDto, operation_id},
     state::AppState,
@@ -127,6 +127,26 @@ pub async fn place_asset(
 ) -> Result<PlacementDto, AppErrorDto> {
     let operation_id = operation_id();
     application::place_asset(&state.pool, input, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn move_asset(
+    state: State<'_, AppState>,
+    input: MoveAssetInput,
+) -> Result<PlacementDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::move_asset(&state.pool, input, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn unplace_asset(
+    state: State<'_, AppState>,
+    input: UnplaceAssetInput,
+) -> Result<UnplaceAssetResultDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::unplace_asset(&state.pool, input, &operation_id).await
 }
 
 #[tauri::command]

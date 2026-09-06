@@ -56,7 +56,7 @@ describe("AssetDetailPage", () => {
     expect(screen.getByText("U10–U11")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "编辑设备" })).toHaveAttribute(
       "href",
-      "/assets/asset-1/edit",
+      "/assets/asset-1/edit?returnTo=%2Fassets%2Fasset-1",
     )
     expect(screen.getByRole("link", { name: "R-A01-01" })).toHaveAttribute(
       "href",

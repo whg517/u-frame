@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { Link, useNavigate, useParams } from "react-router"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { FormField } from "@/shared/components/form-field"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
+import { routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useLocations } from "./queries"
@@ -27,10 +28,12 @@ type FormData = z.infer<typeof schema>
 
 export function RoomFormPage() {
   const { roomId } = useParams()
+  const [searchParams] = useSearchParams()
   const isEditing = Boolean(roomId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const locations = useLocations()
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), roomId ? `/locations/rooms/${roomId}` : "/locations")
   const room = locations.data?.rooms.find((node) => node.room.id === roomId)?.room
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -51,14 +54,16 @@ export function RoomFormPage() {
         ? tauriClient.updateRoom({ roomId, ...input })
         : tauriClient.createRoom(input)
     },
-    onSuccess: async () => {
+    onSuccess: async (savedRoom) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.locations }),
         queryClient.invalidateQueries({ queryKey: queryKeys.racksRoot }),
         queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
         queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
       ])
-      navigate(roomId ? `/locations/rooms/${roomId}` : "/locations")
+      navigate(!isEditing && returnTo.startsWith("/locations/areas/new")
+        ? routeWithParams(returnTo, { roomId: savedRoom.id })
+        : returnTo)
     },
   })
 
@@ -101,7 +106,7 @@ export function RoomFormPage() {
                 <Textarea id="description" placeholder="可选" {...form.register("description")} />
               </FormField>
               <div className="flex justify-end gap-2 border-t pt-5">
-                <Button variant="ghost" nativeButton={false} render={<Link to={roomId ? `/locations/rooms/${roomId}` : "/locations"} />}>
+                <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}>
                   <ArrowLeft /> 取消
                 </Button>
                 <Button type="submit" disabled={save.isPending}>

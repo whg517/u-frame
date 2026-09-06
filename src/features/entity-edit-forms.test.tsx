@@ -44,6 +44,20 @@ function renderRoute(path: string, route: string, element: React.ReactElement) {
 afterEach(() => vi.restoreAllMocks())
 
 describe("entity edit forms", () => {
+  it("prefills a contextual rack and preserves the originating canvas", async () => {
+    vi.spyOn(tauriClient, "listLocations").mockResolvedValue(locations)
+    vi.spyOn(tauriClient, "listRacks").mockResolvedValue([rack])
+    renderRoute(
+      "/racks/new?areaId=area-1&returnTo=%2F%3Farea%3Darea-1",
+      "/racks/new",
+      <RackFormPage />,
+    )
+
+    const area = await screen.findByLabelText("所属区域")
+    await waitFor(() => expect(area).toHaveValue("area-1"))
+    expect(screen.getByRole("button", { name: "取消" })).toHaveAttribute("href", "/?area=area-1")
+  })
+
   it("prefills and updates every room field", async () => {
     vi.spyOn(tauriClient, "listLocations").mockResolvedValue(locations)
     const update = vi.spyOn(tauriClient, "updateRoom").mockResolvedValue(locations.rooms[0].room)

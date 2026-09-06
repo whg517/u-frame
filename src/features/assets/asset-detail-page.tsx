@@ -1,23 +1,52 @@
-import { ArrowLeft, ArrowUpToLine, LocateFixed, Pencil } from "lucide-react"
-import { Link, useParams } from "react-router"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { ArrowLeft, ArrowUpToLine, LocateFixed, Move, Pencil, Unplug } from "lucide-react"
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { DetailList } from "@/shared/components/detail-list"
 import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { assetStatusLabels, assetTypeLabels } from "@/shared/lib/asset-labels"
 import { errorMessage } from "@/shared/lib/errors"
+import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
+import { queryKeys } from "@/shared/lib/query-keys"
+import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useAssets } from "./queries"
 
 export function AssetDetailPage() {
   const { assetId = "" } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const queryClient = useQueryClient()
   const assets = useAssets()
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), "/assets")
+  const asset = assets.data?.find((item) => item.id === assetId)
+  const unplace = useMutation({
+    mutationFn: () => tauriClient.unplaceAsset({ assetId }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
+      ])
+      navigate(routeWithParams(returnTo, { highlight: null }))
+    },
+  })
 
   if (assets.isPending) return <AssetDetailState message="正在读取详情…" />
   if (assets.isError) return <AssetDetailState message={errorMessage(assets.error)} error />
-  const asset = assets.data.find((item) => item.id === assetId)
   if (!asset) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
@@ -27,6 +56,10 @@ export function AssetDetailPage() {
     )
   }
 
+  const origin = currentRoute(location.pathname, location.search)
+  const editPath = routeWithParams(`/assets/${asset.id}/edit`, { returnTo: origin })
+  const placementPath = routeWithParams(`/assets/${asset.id}/place`, { returnTo })
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
@@ -35,16 +68,39 @@ export function AssetDetailPage() {
         description={`${assetTypeLabels[asset.type] ?? asset.type} · ${asset.heightU}U`}
         actions={
           <>
-            <BackToAssets />
-            <Button variant="outline" nativeButton={false} render={<Link to={`/assets/${asset.id}/edit`} />}>
+            <BackToAssets to={returnTo} />
+            <Button variant="outline" nativeButton={false} render={<Link to={editPath} />}>
               <Pencil /> 编辑设备
             </Button>
             {asset.placement ? (
-              <Button nativeButton={false} render={<Link to={`/?area=${asset.placement.areaId}&highlight=${asset.id}`} />}>
-                <LocateFixed /> 在画布中定位
-              </Button>
+              <>
+                <Button variant="outline" nativeButton={false} render={<Link to={placementPath} />}>
+                  <Move /> 移动设备
+                </Button>
+                <Sheet>
+                  <SheetTrigger render={<Button variant="outline" />}><Unplug /> 下架</SheetTrigger>
+                  <SheetContent className="sm:max-w-md">
+                    <SheetHeader>
+                      <SheetTitle>确认下架 {asset.name}</SheetTitle>
+                      <SheetDescription>
+                        当前占用的 {asset.placement.rackCode} · U{asset.placement.startU}–U{asset.placement.endU} 将被释放，设备仍保留在资产台账中。
+                      </SheetDescription>
+                    </SheetHeader>
+                    {unplace.isError ? <p className="px-4 text-sm text-destructive">{errorMessage(unplace.error)}</p> : null}
+                    <SheetFooter>
+                      <Button variant="destructive" disabled={unplace.isPending} onClick={() => unplace.mutate()}>
+                        {unplace.isPending ? "正在下架…" : "确认下架"}
+                      </Button>
+                      <SheetClose render={<Button variant="outline" />}>取消</SheetClose>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
+                <Button nativeButton={false} render={<Link to={`/?area=${asset.placement.areaId}&highlight=${asset.id}`} />}>
+                  <LocateFixed /> 在画布中定位
+                </Button>
+              </>
             ) : (
-              <Button nativeButton={false} render={<Link to={`/assets/${asset.id}/place`} />}>
+              <Button nativeButton={false} render={<Link to={placementPath} />}>
                 <ArrowUpToLine /> 上架设备
               </Button>
             )}
@@ -102,8 +158,8 @@ export function AssetDetailPage() {
   )
 }
 
-function BackToAssets() {
-  return <Button variant="outline" nativeButton={false} render={<Link to="/assets" />}><ArrowLeft /> 返回设备列表</Button>
+function BackToAssets({ to = "/assets" }: { to?: string }) {
+  return <Button variant="outline" nativeButton={false} render={<Link to={to} />}><ArrowLeft /> 返回</Button>
 }
 
 function AssetDetailState({ message, error = false }: { message: string; error?: boolean }) {

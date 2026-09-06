@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus } from "lucide-react"
 import { useEffect } from "react"
 import { useForm, useWatch } from "react-hook-form"
-import { Link, useNavigate, useParams } from "react-router"
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -15,6 +15,7 @@ import { EmptyState } from "@/shared/components/empty-state"
 import { FormField } from "@/shared/components/form-field"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { errorMessage } from "@/shared/lib/errors"
+import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useLocations } from "@/features/locations/queries"
 import { queryKeys } from "@/shared/lib/query-keys"
@@ -33,16 +34,21 @@ type FormData = z.infer<typeof schema>
 
 export function RackFormPage() {
   const { rackId } = useParams()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
   const isEditing = Boolean(rackId)
   const locations = useLocations()
   const racks = useRacks()
   const rack = racks.data?.find((item) => item.id === rackId)
+  const requestedAreaId = searchParams.get("areaId")
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { areaId: "", code: "", specification: "42U", totalU: 42, notes: "" },
+    defaultValues: { areaId: requestedAreaId ?? "", code: "", specification: "42U", totalU: 42, notes: "" },
   })
+  const returnTo = safeReturnTo(searchParams.get("returnTo"), rackId ? `/racks/${rackId}` : "/racks")
+  const origin = currentRoute(location.pathname, location.search)
   const specification = useWatch({ control: form.control, name: "specification" })
   useEffect(() => {
     if (!rack) return
@@ -55,6 +61,14 @@ export function RackFormPage() {
       notes: rack.notes ?? "",
     })
   }, [form, rack])
+  useEffect(() => {
+    if (
+      isEditing
+      || !requestedAreaId
+      || !locations.data?.rooms.some(({ areas }) => areas.some((area) => area.id === requestedAreaId))
+    ) return
+    form.setValue("areaId", requestedAreaId, { shouldValidate: true })
+  }, [form, isEditing, locations.data, requestedAreaId])
   useEffect(() => {
     if (specification !== "custom") {
       form.setValue("totalU", Number.parseInt(specification, 10), { shouldValidate: true })
@@ -77,7 +91,7 @@ export function RackFormPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
         queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
       ])
-      navigate(rackId ? `/racks/${rackId}` : "/racks")
+      navigate(returnTo)
     },
   })
   const areas = locations.data?.rooms.flatMap(({ room, areas }) =>
@@ -100,7 +114,7 @@ export function RackFormPage() {
       />
       <PageBody>
         {locations.isSuccess && areas.length === 0 ? (
-          <EmptyState title="请先创建区域" description="机柜必须属于一个活动区域。" action={<Button nativeButton={false} render={<Link to="/locations/areas/new" />}><Plus /> 新建区域</Button>} />
+          <EmptyState title="请先创建区域" description="机柜必须属于一个活动区域。" action={<Button nativeButton={false} render={<Link to={routeWithParams("/locations/areas/new", { returnTo: origin })} />}><Plus /> 新建区域</Button>} />
         ) : (
           <Card className="mx-auto max-w-2xl">
             <CardContent>
@@ -133,7 +147,7 @@ export function RackFormPage() {
                 </div>
                 <FormField label="备注" htmlFor="notes"><Textarea id="notes" placeholder="可选" {...form.register("notes")} /></FormField>
                 <div className="flex justify-end gap-2 border-t pt-5">
-                  <Button variant="ghost" nativeButton={false} render={<Link to={rackId ? `/racks/${rackId}` : "/racks"} />}><ArrowLeft /> 取消</Button>
+                  <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> 取消</Button>
                   <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存机柜"}</Button>
                 </div>
               </form>

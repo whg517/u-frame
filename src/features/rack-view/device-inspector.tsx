@@ -1,20 +1,51 @@
-import { ExternalLink, X } from "lucide-react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { ExternalLink, Move, Pencil, Unplug, X } from "lucide-react"
 import { Link } from "react-router"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { assetStatusLabels, assetTypeLabels } from "@/shared/lib/asset-labels"
+import { errorMessage } from "@/shared/lib/errors"
+import { routeWithParams } from "@/shared/lib/navigation-context"
+import { queryKeys } from "@/shared/lib/query-keys"
 import type { RackDto, RackPlacementViewDto } from "@/shared/lib/tauri-client/bindings"
+import { tauriClient } from "@/shared/lib/tauri-client/client"
 
 export function DeviceInspector({
   placement,
   rack,
   onClose,
+  returnTo,
 }: {
   placement: RackPlacementViewDto
   rack: RackDto
   onClose: () => void
+  returnTo: string
 }) {
+  const queryClient = useQueryClient()
+  const unplace = useMutation({
+    mutationFn: () => tauriClient.unplaceAsset({ assetId: placement.assetId }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
+      ])
+      onClose()
+    },
+  })
+  const editPath = routeWithParams(`/assets/${placement.assetId}/edit`, { returnTo })
+  const movePath = routeWithParams(`/assets/${placement.assetId}/place`, { returnTo })
+  const detailPath = routeWithParams(`/assets/${placement.assetId}`, { returnTo })
   const rows = [
     ["类型", assetTypeLabels[placement.type] ?? placement.type],
     ["状态", assetStatusLabels[placement.status] ?? placement.status],
@@ -45,14 +76,35 @@ export function DeviceInspector({
           </div>
         ))}
       </dl>
-      <Button
-        className="mt-5 w-full"
-        variant="outline"
-        nativeButton={false}
-        render={<Link to={`/assets/${placement.assetId}`} />}
-      >
-        查看完整详情 <ExternalLink />
-      </Button>
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        <Button variant="outline" nativeButton={false} render={<Link to={editPath} />}>
+          <Pencil /> 编辑
+        </Button>
+        <Button variant="outline" nativeButton={false} render={<Link to={movePath} />}>
+          <Move /> 移动
+        </Button>
+        <Sheet>
+          <SheetTrigger render={<Button variant="outline" />}><Unplug /> 下架</SheetTrigger>
+          <SheetContent className="sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>确认下架 {placement.name}</SheetTitle>
+              <SheetDescription>
+                当前占用的 {rack.code} · U{placement.startU}–U{placement.endU} 将被释放，设备仍保留在资产台账中。
+              </SheetDescription>
+            </SheetHeader>
+            {unplace.isError ? <p className="px-4 text-sm text-destructive">{errorMessage(unplace.error)}</p> : null}
+            <SheetFooter>
+              <Button variant="destructive" disabled={unplace.isPending} onClick={() => unplace.mutate()}>
+                {unplace.isPending ? "正在下架…" : "确认下架"}
+              </Button>
+              <SheetClose render={<Button variant="outline" />}>取消</SheetClose>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+        <Button variant="outline" nativeButton={false} render={<Link to={detailPath} />}>
+          完整详情 <ExternalLink />
+        </Button>
+      </div>
     </aside>
   )
 }

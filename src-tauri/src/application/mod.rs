@@ -8,9 +8,10 @@ use crate::{
     domain,
     dto::{
         AreaDto, AssetDto, AssetPlacementDto, CreateAreaInput, CreateAssetInput, CreateRackInput,
-        CreateRoomInput, LocationTreeDto, PlaceAssetInput, PlacementDto, RackCanvasDto, RackDto,
-        RackPlacementViewDto, RackViewDto, ReorderRacksInput, ReorderRacksResultDto, RoomDto,
-        RoomNodeDto, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
+        CreateRoomInput, LocationTreeDto, MoveAssetInput, PlaceAssetInput, PlacementDto,
+        RackCanvasDto, RackDto, RackPlacementViewDto, RackViewDto, ReorderRacksInput,
+        ReorderRacksResultDto, RoomDto, RoomNodeDto, UnplaceAssetInput, UnplaceAssetResultDto,
+        UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
     },
     error::AppErrorDto,
     infrastructure::repository,
@@ -831,6 +832,192 @@ pub async fn place_asset(
     })
 }
 
+pub async fn move_asset(
+    pool: &SqlitePool,
+    input: MoveAssetInput,
+    operation_id: &str,
+) -> Result<PlacementDto, AppErrorDto> {
+    let asset_id = domain::required(&input.asset_id, operation_id, "assetId")?;
+    let rack_id = domain::required(&input.rack_id, operation_id, "rackId")?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let asset = repository::find_asset_for_placement(&mut *transaction, &asset_id)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?
+        .ok_or_else(|| {
+            AppErrorDto::validation(
+                operation_id,
+                "Placement.AssetUnavailable",
+                "设备不存在或不可用",
+                "assetId",
+            )
+        })?;
+    if asset.status == "archived" {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Placement.AssetUnavailable",
+            "已归档设备不能移动",
+            "assetId",
+        ));
+    }
+    let rack = repository::find_rack_for_placement(&mut *transaction, &rack_id)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?
+        .ok_or_else(|| {
+            AppErrorDto::validation(
+                operation_id,
+                "Placement.RackUnavailable",
+                "机柜不存在或不可用",
+                "rackId",
+            )
+        })?;
+    if rack.status != "active" {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Placement.RackUnavailable",
+            "机柜不可用",
+            "rackId",
+        ));
+    }
+    let (_, end_u) = domain::placement_range(
+        input.start_u,
+        asset.height_u,
+        rack.total_u,
+        &rack_id,
+        operation_id,
+    )?;
+    let current = sqlx::query(
+        "SELECT id, rack_id, start_u FROM rack_placements WHERE asset_id = ? AND removed_at IS NULL LIMIT 1",
+    )
+    .bind(&asset_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let current = current.ok_or_else(|| {
+        AppErrorDto::validation(
+            operation_id,
+            "Placement.AssetNotPlaced",
+            "设备尚未上架",
+            "assetId",
+        )
+    })?;
+    let current_id: String = current.get("id");
+    let current_rack_id: String = current.get("rack_id");
+    let current_start_u: i32 = current.get("start_u");
+    if current_rack_id == rack_id && current_start_u == input.start_u {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Placement.Unchanged",
+            "请选择不同的机柜或 U 位",
+            "startU",
+        ));
+    }
+    let conflict: Option<String> = sqlx::query_scalar(
+        r#"
+        SELECT asset_id FROM rack_placements
+        WHERE rack_id = ? AND removed_at IS NULL AND id != ?
+          AND start_u <= ? AND start_u + height_u - 1 >= ?
+        LIMIT 1
+        "#,
+    )
+    .bind(&rack_id)
+    .bind(&current_id)
+    .bind(end_u)
+    .bind(input.start_u)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    if let Some(conflicting_asset_id) = conflict {
+        return Err(AppErrorDto::placement(
+            operation_id,
+            "Placement.Overlap",
+            "目标 U 位已被占用",
+            &rack_id,
+            input.start_u,
+            end_u,
+            Some(conflicting_asset_id),
+        ));
+    }
+    let changed_at = now();
+    sqlx::query("UPDATE rack_placements SET removed_at = ? WHERE id = ? AND removed_at IS NULL")
+        .bind(&changed_at)
+        .bind(&current_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let placement_id = id();
+    sqlx::query(
+        "INSERT INTO rack_placements (id, rack_id, asset_id, start_u, height_u, placed_at, removed_at) VALUES (?, ?, ?, ?, ?, ?, NULL)",
+    )
+    .bind(&placement_id)
+    .bind(&rack_id)
+    .bind(&asset_id)
+    .bind(input.start_u)
+    .bind(asset.height_u)
+    .bind(&changed_at)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    Ok(PlacementDto {
+        id: placement_id,
+        rack_id,
+        asset_id,
+        start_u: input.start_u,
+        end_u,
+        height_u: asset.height_u,
+        placed_at: changed_at,
+    })
+}
+
+pub async fn unplace_asset(
+    pool: &SqlitePool,
+    input: UnplaceAssetInput,
+    operation_id: &str,
+) -> Result<UnplaceAssetResultDto, AppErrorDto> {
+    let asset_id = domain::required(&input.asset_id, operation_id, "assetId")?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let placement_id: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM rack_placements WHERE asset_id = ? AND removed_at IS NULL LIMIT 1",
+    )
+    .bind(&asset_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let placement_id = placement_id.ok_or_else(|| {
+        AppErrorDto::validation(
+            operation_id,
+            "Placement.AssetNotPlaced",
+            "设备尚未上架",
+            "assetId",
+        )
+    })?;
+    let removed_at = now();
+    sqlx::query("UPDATE rack_placements SET removed_at = ? WHERE id = ? AND removed_at IS NULL")
+        .bind(&removed_at)
+        .bind(&placement_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    transaction
+        .commit()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    Ok(UnplaceAssetResultDto {
+        asset_id,
+        placement_id,
+        removed_at,
+    })
+}
+
 pub async fn get_rack_view(
     pool: &SqlitePool,
     area_id: Option<String>,
@@ -1121,16 +1308,17 @@ pub async fn seed_dev_data(
 mod tests {
     use crate::{
         dto::{
-            CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput, PlaceAssetInput,
-            ReorderRacksInput, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
+            CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput, MoveAssetInput,
+            PlaceAssetInput, ReorderRacksInput, UnplaceAssetInput, UpdateAreaInput,
+            UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
         },
         state::AppState,
     };
 
     use super::{
         create_area, create_asset, create_rack, create_room, get_rack_view, list_assets,
-        list_locations, list_racks, place_asset, reorder_racks, seed_dev_data, update_area,
-        update_asset, update_rack, update_room,
+        list_locations, list_racks, move_asset, place_asset, reorder_racks, seed_dev_data,
+        unplace_asset, update_area, update_asset, update_rack, update_room,
     };
 
     async fn fixture() -> AppState {
@@ -1304,6 +1492,136 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn moves_and_unplaces_asset_while_preserving_history() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let assets = list_assets(&state.pool, "op").await.unwrap();
+        let asset = assets
+            .iter()
+            .find(|asset| asset.placement.is_some())
+            .unwrap();
+        let original = asset.placement.as_ref().unwrap();
+        let unchanged = move_asset(
+            &state.pool,
+            MoveAssetInput {
+                asset_id: asset.id.clone(),
+                rack_id: original.rack_id.clone(),
+                start_u: original.start_u,
+            },
+            "op",
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(unchanged.code, "Placement.Unchanged");
+        let racks = list_racks(&state.pool, None, "op").await.unwrap();
+        let target = racks
+            .iter()
+            .find(|rack| rack.id != original.rack_id)
+            .unwrap();
+
+        let moved = move_asset(
+            &state.pool,
+            MoveAssetInput {
+                asset_id: asset.id.clone(),
+                rack_id: target.id.clone(),
+                start_u: target.total_u - asset.height_u + 1,
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+        assert_eq!(moved.rack_id, target.id);
+
+        let active_count: i32 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM rack_placements WHERE asset_id = ? AND removed_at IS NULL",
+        )
+        .bind(&asset.id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+        let history_count: i32 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM rack_placements WHERE asset_id = ?")
+                .bind(&asset.id)
+                .fetch_one(&state.pool)
+                .await
+                .unwrap();
+        assert_eq!(active_count, 1);
+        assert_eq!(history_count, 2);
+
+        unplace_asset(
+            &state.pool,
+            UnplaceAssetInput {
+                asset_id: asset.id.clone(),
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+        let refreshed = list_assets(&state.pool, "op").await.unwrap();
+        assert!(
+            refreshed
+                .iter()
+                .find(|item| item.id == asset.id)
+                .unwrap()
+                .placement
+                .is_none()
+        );
+        let history_count: i32 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM rack_placements WHERE asset_id = ?")
+                .bind(&asset.id)
+                .fetch_one(&state.pool)
+                .await
+                .unwrap();
+        assert_eq!(history_count, 2);
+    }
+
+    #[tokio::test]
+    async fn failed_move_keeps_original_placement_active() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let assets = list_assets(&state.pool, "op").await.unwrap();
+        let placed: Vec<_> = assets
+            .iter()
+            .filter(|asset| asset.placement.is_some())
+            .collect();
+        let moving = placed[0];
+        let occupied = placed
+            .iter()
+            .find(|asset| {
+                asset.placement.as_ref().unwrap().rack_id
+                    != moving.placement.as_ref().unwrap().rack_id
+            })
+            .unwrap();
+        let target = occupied.placement.as_ref().unwrap();
+
+        let error = move_asset(
+            &state.pool,
+            MoveAssetInput {
+                asset_id: moving.id.clone(),
+                rack_id: target.rack_id.clone(),
+                start_u: target.start_u,
+            },
+            "op",
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, "Placement.Overlap");
+
+        let refreshed = list_assets(&state.pool, "op").await.unwrap();
+        let placement = refreshed
+            .iter()
+            .find(|asset| asset.id == moving.id)
+            .unwrap()
+            .placement
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            placement.placement_id,
+            moving.placement.as_ref().unwrap().placement_id
+        );
     }
 
     #[tokio::test]

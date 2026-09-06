@@ -21,7 +21,7 @@ describe("MultiSelectFilter", () => {
       />,
     )
 
-    expect(screen.getByLabelText("机房筛选：全部机房")).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText("机房筛选：全部机房"))
     fireEvent.click(screen.getByRole("checkbox", { name: /上海机房/ }))
     expect(onChange).toHaveBeenCalledWith(["room-a"])
   })
@@ -38,8 +38,8 @@ describe("MultiSelectFilter", () => {
       />,
     )
 
-    expect(screen.getByLabelText("机房筛选：已选 2 个机房")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("checkbox", { name: "全部机房" }))
+    fireEvent.click(screen.getByLabelText("机房筛选：上海机房、杭州机房"))
+    fireEvent.click(screen.getByRole("button", { name: "清除" }))
     expect(onChange).toHaveBeenCalledWith([])
   })
 })

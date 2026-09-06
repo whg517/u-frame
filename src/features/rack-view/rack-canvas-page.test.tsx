@@ -36,6 +36,24 @@ const view: RackViewDto = {
 afterEach(() => vi.restoreAllMocks())
 
 describe("RackCanvasPage location filters", () => {
+  it("keeps canvas context when the empty state starts rack creation", async () => {
+    vi.spyOn(tauriClient, "listLocations").mockResolvedValue({ rooms: [locations.rooms[0]] })
+    vi.spyOn(tauriClient, "getRackView").mockResolvedValue({ racks: [] })
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/"]}>
+          <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole("button", { name: "创建机柜" })).toHaveAttribute(
+      "href",
+      "/racks/new?areaId=area-a&returnTo=%2F",
+    )
+  })
+
   it("loads the full projection and combines repeated room and area selections", async () => {
     vi.spyOn(tauriClient, "listLocations").mockResolvedValue(locations)
     const getRackView = vi.spyOn(tauriClient, "getRackView").mockResolvedValue(view)
@@ -52,14 +70,16 @@ describe("RackCanvasPage location filters", () => {
     expect(screen.queryByRole("region", { name: "B-01，18U" })).not.toBeInTheDocument()
     expect(getRackView).toHaveBeenCalledWith()
 
+    fireEvent.click(screen.getByLabelText("机房筛选：上海机房"))
     fireEvent.click(screen.getByRole("checkbox", { name: /杭州机房/ }))
+    fireEvent.click(screen.getByLabelText("区域筛选：A 区"))
     fireEvent.click(screen.getByRole("checkbox", { name: /B 区/ }))
 
     await waitFor(() => {
       expect(screen.getByRole("region", { name: "A-01，18U" })).toBeInTheDocument()
       expect(screen.getByRole("region", { name: "B-01，18U" })).toBeInTheDocument()
     })
-    expect(screen.getByLabelText("机房筛选：已选 2 个机房")).toBeInTheDocument()
-    expect(screen.getByLabelText("区域筛选：已选 2 个区域")).toBeInTheDocument()
+    expect(screen.getByLabelText("机房筛选：上海机房、杭州机房")).toBeInTheDocument()
+    expect(screen.getByLabelText("区域筛选：A 区、B 区")).toBeInTheDocument()
   })
 })

@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { useState, type CSSProperties, type WheelEvent } from "react"
-import { Link, useSearchParams } from "react-router"
+import { Link, useLocation, useSearchParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/shared/components/empty-state"
 import { errorMessage } from "@/shared/lib/errors"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
+import { currentRoute, routeWithParams } from "@/shared/lib/navigation-context"
 import { useLocations } from "@/features/locations/queries"
 import { DeviceInspector } from "./device-inspector"
 import { CanvasZoomControls } from "./canvas-zoom-controls"
@@ -20,6 +21,8 @@ import "./rack-canvas.css"
 export function RackCanvasPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [zoom, setZoom] = useState(1)
+  const [openFilter, setOpenFilter] = useState<"room" | "area" | null>(null)
+  const location = useLocation()
   const queryClient = useQueryClient()
   const roomIds = searchParams.getAll("room")
   const areaIds = searchParams.getAll("area")
@@ -48,6 +51,16 @@ export function RackCanvasPage() {
     ? areas
     : areas.filter((area) => roomIds.includes(area.roomId))
   const visibleRacks = filterRackCanvases(view.data?.racks ?? [], roomIds, areaIds)
+  const origin = currentRoute(location.pathname, location.search)
+  const contextualAreaId = areaIds.length === 1
+    ? areaIds[0]
+    : visibleAreas.length === 1
+      ? visibleAreas[0].id
+      : null
+  const createRackPath = routeWithParams("/racks/new", {
+    areaId: contextualAreaId,
+    returnTo: origin,
+  })
   const selection = (() => {
     for (const rack of visibleRacks) {
       const placement = rack.placements.find((item) => item.assetId === selectedAssetId)
@@ -107,6 +120,8 @@ export function RackCanvasPage() {
             values={roomIds}
             onChange={updateRooms}
             disabled={locations.isPending || locations.isError}
+            open={openFilter === "room"}
+            onOpenChange={(open) => setOpenFilter(open ? "room" : null)}
           />
           <MultiSelectFilter
             label="区域"
@@ -115,12 +130,14 @@ export function RackCanvasPage() {
             values={areaIds}
             onChange={updateAreas}
             disabled={locations.isPending || locations.isError}
+            open={openFilter === "area"}
+            onOpenChange={(open) => setOpenFilter(open ? "area" : null)}
           />
           <Button
             variant="outline"
             size="sm"
             nativeButton={false}
-            render={<Link to="/racks/new" />}
+            render={<Link to={createRackPath} />}
           >
             <Plus /> 新建机柜
           </Button>
@@ -150,7 +167,7 @@ export function RackCanvasPage() {
                   action={
                     roomIds.length > 0 || areaIds.length > 0
                       ? <Button variant="outline" onClick={clearFilters}>查看全部</Button>
-                      : <Button nativeButton={false} render={<Link to="/racks/new" />}><Plus /> 创建机柜</Button>
+                      : <Button nativeButton={false} render={<Link to={createRackPath} />}><Plus /> 创建机柜</Button>
                   }
                 />
               </div>
@@ -194,6 +211,7 @@ export function RackCanvasPage() {
           <DeviceInspector
             placement={selection.placement}
             rack={selection.rack}
+            returnTo={origin}
             onClose={() => {
               const next = new URLSearchParams(searchParams)
               next.delete("highlight")

@@ -1,4 +1,5 @@
 import { Check, ChevronDown } from "lucide-react"
+import { Popover } from "@base-ui/react/popover"
 
 import { cn } from "@/lib/utils"
 
@@ -15,6 +16,8 @@ interface MultiSelectFilterProps {
   values: string[]
   onChange: (values: string[]) => void
   disabled?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function MultiSelectFilter({
@@ -24,6 +27,8 @@ export function MultiSelectFilter({
   values,
   onChange,
   disabled = false,
+  open,
+  onOpenChange,
 }: MultiSelectFilterProps) {
   const selected = new Set(values)
   const selectedOptions = options.filter((option) => selected.has(option.value))
@@ -31,7 +36,9 @@ export function MultiSelectFilter({
     ? allLabel
     : selectedOptions.length === 1
       ? selectedOptions[0].label
-      : `已选 ${selectedOptions.length} 个${label}`
+      : selectedOptions.length <= 2
+        ? selectedOptions.map((option) => option.label).join("、")
+        : `已选 ${selectedOptions.length} 个${label}`
 
   const toggle = (value: string, checked: boolean) => {
     onChange(checked
@@ -40,39 +47,58 @@ export function MultiSelectFilter({
   }
 
   return (
-    <details className="group relative" data-testid={`${label}-filter`}>
-      <summary
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Popover.Trigger
         aria-label={`${label}筛选：${summary}`}
         className={cn(
-          "flex h-8 min-w-36 cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-input bg-background px-2.5 text-sm outline-none marker:hidden hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+          "flex h-8 min-w-36 cursor-pointer items-center justify-between gap-3 rounded-md border border-input bg-background px-2.5 text-sm outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 data-popup-open:bg-muted/50",
           disabled && "pointer-events-none opacity-50",
         )}
+        disabled={disabled}
+        data-testid={`${label}-filter`}
       >
         <span className="max-w-36 truncate">{summary}</span>
-        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="absolute right-0 z-30 mt-1 w-64 rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-lg">
-        <FilterOption
-          checked={values.length === 0}
-          label={allLabel}
-          onChange={() => onChange([])}
-        />
-        <div className="my-1 border-t" />
-        <div className="max-h-64 overflow-auto">
-          {options.length === 0 ? (
-            <p className="px-2 py-3 text-xs text-muted-foreground">没有可选{label}</p>
-          ) : options.map((option) => (
-            <FilterOption
-              key={option.value}
-              checked={selected.has(option.value)}
-              label={option.label}
-              description={option.description}
-              onChange={(checked) => toggle(option.value, checked)}
-            />
-          ))}
-        </div>
-      </div>
-    </details>
+        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform data-[popup-open]:rotate-180" />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner side="bottom" align="end" sideOffset={6} className="z-50">
+          <Popover.Popup className="w-64 origin-top-right rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-lg outline-none transition data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+            <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+              <div>
+                <p className="text-sm font-medium">选择{label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {values.length === 0 ? `当前显示${allLabel}` : `已选择 ${values.length} 项`}
+                </p>
+              </div>
+              {values.length > 0 ? (
+                <button className="text-xs text-muted-foreground hover:text-foreground" type="button" onClick={() => onChange([])}>
+                  清除
+                </button>
+              ) : null}
+            </div>
+            <div className="my-1 border-t" />
+            <div className="max-h-64 overflow-auto">
+              {options.length === 0 ? (
+                <p className="px-2 py-3 text-xs text-muted-foreground">没有可选{label}</p>
+              ) : options.map((option) => (
+                <FilterOption
+                  key={option.value}
+                  checked={selected.has(option.value)}
+                  label={option.label}
+                  description={option.description}
+                  onChange={(checked) => toggle(option.value, checked)}
+                />
+              ))}
+            </div>
+            <div className="mt-1 border-t p-1 pt-2">
+              <Popover.Close className="h-8 w-full rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                完成
+              </Popover.Close>
+            </div>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   )
 }
 
