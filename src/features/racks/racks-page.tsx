@@ -16,7 +16,6 @@ export function RacksPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Rack inventory"
         title="机柜管理"
         description="维护机柜规格和所属物理位置。"
         actions={<Button nativeButton={false} render={<Link to="/racks/new" />}><Plus /> 新建机柜</Button>}

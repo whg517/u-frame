@@ -77,7 +77,6 @@ export function RoomFormPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Location"
         title={isEditing ? "编辑机房" : "新建机房"}
         description={isEditing ? "修改机房编码、名称和描述。" : "创建物理位置的第一层。"}
       />

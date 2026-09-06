@@ -63,7 +63,6 @@ export function AssetDetailPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Asset detail"
         title={asset.name}
         description={`${assetTypeLabels[asset.type] ?? asset.type} · ${asset.heightU}U`}
         actions={

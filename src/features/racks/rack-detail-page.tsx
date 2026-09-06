@@ -52,7 +52,6 @@ export function RackDetailPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Rack detail"
         title={rack.code}
         description={`${rack.roomName} / ${rack.areaName}`}
         actions={

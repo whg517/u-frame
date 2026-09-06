@@ -94,7 +94,6 @@ export function PlacementFormPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Rack placement"
         title={isMoving ? "移动设备" : "设备上架"}
         description="选择目标机柜和最低占用 U 位；可用连续空间会随目标机柜更新。"
       />

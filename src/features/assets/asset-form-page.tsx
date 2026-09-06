@@ -111,7 +111,6 @@ export function AssetFormPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Physical assets"
         title={isEditing ? "编辑设备" : "新建设备"}
         description={isEditing ? "修改设备台账字段；已上架设备调整高度时会重新校验 U 位。" : "设备可以暂不上架，物理位置由上架记录统一维护。"}
       />

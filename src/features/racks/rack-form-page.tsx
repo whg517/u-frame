@@ -108,7 +108,6 @@ export function RackFormPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Rack inventory"
         title={isEditing ? "编辑机柜" : "新建机柜"}
         description={isEditing ? "修改位置、编码、规格、功率和备注。" : "选择标准规格或输入自定义 U 数。"}
       />

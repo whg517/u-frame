@@ -96,7 +96,6 @@ export function AreaFormPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Location"
         title={isEditing ? "编辑区域" : "新建区域"}
         description={isEditing ? "修改所属机房、编码、名称和描述。" : "在已有机房下建立区域。"}
       />

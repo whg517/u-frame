@@ -63,7 +63,6 @@ export function RoomDetailPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Room detail"
         title={node.room.name}
         description={`机房编码 ${node.room.code}`}
         actions={
@@ -159,7 +158,6 @@ export function AreaDetailPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Area detail"
         title={area.name}
         description={`${roomNode.room.name} / ${area.code}`}
         actions={

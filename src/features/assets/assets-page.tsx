@@ -59,7 +59,6 @@ export function AssetsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Physical assets"
         title={targetRack ? `选择设备上架到 ${targetRack.code}` : "设备资产"}
         description={targetRack ? `${targetRack.roomName} / ${targetRack.areaName} · 仅显示符合当前筛选的设备。` : "管理服务器和网络设备，并记录当前上架位置。"}
         actions={

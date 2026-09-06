@@ -14,7 +14,6 @@ export function LocationsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        eyebrow="Physical location"
         title="位置管理"
         description="按照机房和区域组织机柜。"
         actions={
