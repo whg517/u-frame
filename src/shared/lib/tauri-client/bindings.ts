@@ -17,6 +17,7 @@ export const commands = {
 	updateAsset: (input: UpdateAssetInput) => typedError<AssetDto, AppErrorDto>(__TAURI_INVOKE("update_asset", { input })),
 	placeAsset: (input: PlaceAssetInput) => typedError<PlacementDto, AppErrorDto>(__TAURI_INVOKE("place_asset", { input })),
 	moveAsset: (input: MoveAssetInput) => typedError<PlacementDto, AppErrorDto>(__TAURI_INVOKE("move_asset", { input })),
+	moveAssets: (input: MoveAssetsInput) => typedError<MoveAssetsResultDto, AppErrorDto>(__TAURI_INVOKE("move_assets", { input })),
 	unplaceAsset: (input: UnplaceAssetInput) => typedError<UnplaceAssetResultDto, AppErrorDto>(__TAURI_INVOKE("unplace_asset", { input })),
 	getRackView: (areaId: string | null) => typedError<RackViewDto, AppErrorDto>(__TAURI_INVOKE("get_rack_view", { areaId })),
 	reorderRacks: (input: ReorderRacksInput) => typedError<ReorderRacksResultDto, AppErrorDto>(__TAURI_INVOKE("reorder_racks", { input })),
@@ -67,6 +68,12 @@ export type AssetPlacementDto = {
 	roomName: string,
 	startU: number,
 	endU: number,
+};
+
+export type AssetPlacementMoveInput = {
+	assetId: string,
+	rackId: string,
+	startU: number,
 };
 
 export type CreateAreaInput = {
@@ -122,6 +129,14 @@ export type MoveAssetInput = {
 	assetId: string,
 	rackId: string,
 	startU: number,
+};
+
+export type MoveAssetsInput = {
+	moves: AssetPlacementMoveInput[],
+};
+
+export type MoveAssetsResultDto = {
+	placements: PlacementDto[],
 };
 
 export type PlaceAssetInput = {

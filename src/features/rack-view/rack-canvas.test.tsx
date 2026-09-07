@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
 import type { RackCanvasDto } from "@/shared/lib/tauri-client/bindings"
@@ -33,14 +33,21 @@ const racks: RackCanvasDto[] = [
 function renderCanvas(overrides?: {
   onSelectAsset?: (asset: RackCanvasDto["placements"][number]) => void
   onReorderRacks?: (rackIds: string[]) => Promise<void>
+  onMoveAsset?: (move: { assetId: string; rackId: string; startU: number }) => void
+  onEditStart?: () => void
 }) {
   return render(
     <RackCanvas
       racks={racks}
       selectedAssetId={null}
       isReordering={false}
+      isLayoutEditing={false}
+      isLayoutSaving={false}
+      draftAssetIds={[]}
       onSelectAsset={overrides?.onSelectAsset ?? vi.fn()}
       onReorderRacks={overrides?.onReorderRacks ?? vi.fn().mockResolvedValue(undefined)}
+      onMoveAsset={overrides?.onMoveAsset ?? vi.fn()}
+      onEditStart={overrides?.onEditStart ?? vi.fn()}
     />,
   )
 }
@@ -59,6 +66,35 @@ describe("RackCanvas", () => {
     renderCanvas({ onSelectAsset: onSelect })
     fireEvent.click(screen.getByRole("button", { name: "计算节点，U19 到 U22" }))
     expect(onSelect).toHaveBeenCalledWith(racks[0].placements[0])
+  })
+
+  it("enters edit mode and stages a device drop in another rack", () => {
+    const onEditStart = vi.fn()
+    const onMoveAsset = vi.fn()
+    renderCanvas({ onEditStart, onMoveAsset })
+    const device = screen.getByRole("button", { name: "计算节点，U19 到 U22" })
+    const targetRack = screen.getByRole("region", { name: "A-02，27U" })
+    const targetBody = targetRack.querySelector(".rack-body") as HTMLDivElement
+    vi.spyOn(device, "getBoundingClientRect").mockReturnValue({
+      top: 0, bottom: 52, height: 52, left: 0, right: 100, width: 100,
+      x: 0, y: 0, toJSON: () => ({}),
+    })
+    vi.spyOn(targetBody, "getBoundingClientRect").mockReturnValue({
+      top: 0, bottom: 351, height: 351, left: 0, right: 200, width: 200,
+      x: 0, y: 0, toJSON: () => ({}),
+    })
+    const dataTransfer = { effectAllowed: "none", dropEffect: "none", setData: vi.fn() }
+
+    const dragStart = createEvent.dragStart(device, { dataTransfer })
+    Object.defineProperty(dragStart, "clientY", { value: 39 })
+    fireEvent(device, dragStart)
+    const dragOver = createEvent.dragOver(targetBody, { dataTransfer })
+    Object.defineProperty(dragOver, "clientY", { value: 260 })
+    fireEvent(targetBody, dragOver)
+    fireEvent.drop(targetBody, { clientY: 260, dataTransfer })
+
+    expect(onEditStart).toHaveBeenCalledOnce()
+    expect(onMoveAsset).toHaveBeenCalledWith({ assetId: "asset-1", rackId: "rack-2", startU: 7 })
   })
 
   it("persists keyboard reordering and updates the visible order", async () => {

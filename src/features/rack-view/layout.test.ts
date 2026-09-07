@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import {
   clampCanvasZoom,
+  deviceGrabOffset,
+  droppedDeviceStartU,
   MAX_CANVAS_ZOOM,
   MIN_CANVAS_ZOOM,
   placementGeometry,
@@ -19,6 +21,14 @@ describe("placementGeometry", () => {
       bottom: 18 * U_HEIGHT,
       height: 4 * U_HEIGHT,
     })
+  })
+})
+
+describe("device drag geometry", () => {
+  it("keeps the grabbed device unit under the pointer when dropping", () => {
+    expect(deviceGrabOffset(74, 52, 52, 4)).toBe(2)
+    expect(droppedDeviceStartU(117, 0, 234, 18, 4, 2)).toBe(8)
+    expect(droppedDeviceStartU(-20, 0, 234, 18, 4, 2)).toBe(15)
   })
 })
 

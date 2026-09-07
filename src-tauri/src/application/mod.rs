@@ -8,10 +8,10 @@ use crate::{
     domain,
     dto::{
         AreaDto, AssetDto, AssetPlacementDto, CreateAreaInput, CreateAssetInput, CreateRackInput,
-        CreateRoomInput, LocationTreeDto, MoveAssetInput, PlaceAssetInput, PlacementDto,
-        RackCanvasDto, RackDto, RackPlacementViewDto, RackViewDto, ReorderRacksInput,
-        ReorderRacksResultDto, RoomDto, RoomNodeDto, UnplaceAssetInput, UnplaceAssetResultDto,
-        UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
+        CreateRoomInput, LocationTreeDto, MoveAssetInput, MoveAssetsInput, MoveAssetsResultDto,
+        PlaceAssetInput, PlacementDto, RackCanvasDto, RackDto, RackPlacementViewDto, RackViewDto,
+        ReorderRacksInput, ReorderRacksResultDto, RoomDto, RoomNodeDto, UnplaceAssetInput,
+        UnplaceAssetResultDto, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
     },
     error::AppErrorDto,
     infrastructure::repository,
@@ -975,6 +975,242 @@ pub async fn move_asset(
     })
 }
 
+pub async fn move_assets(
+    pool: &SqlitePool,
+    input: MoveAssetsInput,
+    operation_id: &str,
+) -> Result<MoveAssetsResultDto, AppErrorDto> {
+    if input.moves.is_empty() {
+        return Err(AppErrorDto::validation(
+            operation_id,
+            "Placement.BatchEmpty",
+            "没有需要保存的位置调整",
+            "moves",
+        ));
+    }
+
+    let mut seen_asset_ids = HashSet::new();
+    let mut requested_moves = Vec::with_capacity(input.moves.len());
+    for requested in input.moves {
+        let asset_id = domain::required(&requested.asset_id, operation_id, "assetId")?;
+        let rack_id = domain::required(&requested.rack_id, operation_id, "rackId")?;
+        if !seen_asset_ids.insert(asset_id.clone()) {
+            return Err(AppErrorDto::validation(
+                operation_id,
+                "Placement.DuplicateAsset",
+                "同一设备不能重复提交位置调整",
+                "moves",
+            ));
+        }
+        requested_moves.push((asset_id, rack_id, requested.start_u));
+    }
+
+    #[derive(Clone)]
+    struct ActivePlacement {
+        id: String,
+        rack_id: String,
+        asset_id: String,
+        start_u: i32,
+        height_u: i32,
+        asset_status: String,
+    }
+
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let active_placements = sqlx::query(
+        r#"
+        SELECT placement.id, placement.rack_id, placement.asset_id,
+               placement.start_u, placement.height_u, asset.status AS asset_status
+        FROM rack_placements placement
+        JOIN assets asset ON asset.id = placement.asset_id
+        WHERE placement.removed_at IS NULL
+        "#,
+    )
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|error| AppErrorDto::database(operation_id, error))?
+    .into_iter()
+    .map(|row| ActivePlacement {
+        id: row.get("id"),
+        rack_id: row.get("rack_id"),
+        asset_id: row.get("asset_id"),
+        start_u: row.get("start_u"),
+        height_u: row.get("height_u"),
+        asset_status: row.get("asset_status"),
+    })
+    .collect::<Vec<_>>();
+    let current_by_asset = active_placements
+        .iter()
+        .cloned()
+        .map(|placement| (placement.asset_id.clone(), placement))
+        .collect::<HashMap<_, _>>();
+
+    let rack_rows = sqlx::query("SELECT id, total_u, status FROM racks")
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    let racks = rack_rows
+        .into_iter()
+        .map(|row| {
+            let id: String = row.get("id");
+            let total_u: i32 = row.get("total_u");
+            let status: String = row.get("status");
+            (id, (total_u, status))
+        })
+        .collect::<HashMap<_, _>>();
+
+    for (asset_id, rack_id, start_u) in &requested_moves {
+        let current = current_by_asset.get(asset_id).ok_or_else(|| {
+            AppErrorDto::validation(
+                operation_id,
+                "Placement.AssetNotPlaced",
+                "设备尚未上架",
+                "assetId",
+            )
+        })?;
+        if current.asset_status == "archived" {
+            return Err(AppErrorDto::validation(
+                operation_id,
+                "Placement.AssetUnavailable",
+                "已归档设备不能移动",
+                "assetId",
+            ));
+        }
+        let (rack_total_u, rack_status) = racks.get(rack_id).ok_or_else(|| {
+            AppErrorDto::validation(
+                operation_id,
+                "Placement.RackUnavailable",
+                "机柜不存在或不可用",
+                "rackId",
+            )
+        })?;
+        if rack_status != "active" {
+            return Err(AppErrorDto::validation(
+                operation_id,
+                "Placement.RackUnavailable",
+                "机柜不可用",
+                "rackId",
+            ));
+        }
+        domain::placement_range(
+            *start_u,
+            current.height_u,
+            *rack_total_u,
+            rack_id,
+            operation_id,
+        )?;
+        if current.rack_id == *rack_id && current.start_u == *start_u {
+            return Err(AppErrorDto::validation(
+                operation_id,
+                "Placement.Unchanged",
+                "提交的位置没有变化",
+                "moves",
+            ));
+        }
+    }
+
+    let requested_by_asset = requested_moves
+        .iter()
+        .map(|(asset_id, rack_id, start_u)| (asset_id.as_str(), (rack_id.as_str(), *start_u)))
+        .collect::<HashMap<_, _>>();
+    let mut occupied_by_rack: HashMap<String, Vec<(String, i32, i32)>> = HashMap::new();
+    for placement in &active_placements {
+        let (rack_id, start_u) = requested_by_asset
+            .get(placement.asset_id.as_str())
+            .copied()
+            .unwrap_or((placement.rack_id.as_str(), placement.start_u));
+        let (rack_total_u, rack_status) = racks.get(rack_id).ok_or_else(|| {
+            AppErrorDto::validation(
+                operation_id,
+                "Placement.RackUnavailable",
+                "机柜不存在或不可用",
+                "rackId",
+            )
+        })?;
+        if rack_status != "active" {
+            return Err(AppErrorDto::validation(
+                operation_id,
+                "Placement.RackUnavailable",
+                "机柜不可用",
+                "rackId",
+            ));
+        }
+        let (_, end_u) = domain::placement_range(
+            start_u,
+            placement.height_u,
+            *rack_total_u,
+            rack_id,
+            operation_id,
+        )?;
+        let occupied = occupied_by_rack.entry(rack_id.to_owned()).or_default();
+        if let Some((conflicting_asset_id, _, _)) =
+            occupied.iter().find(|(_, occupied_start, occupied_end)| {
+                domain::ranges_overlap(start_u, end_u, *occupied_start, *occupied_end)
+            })
+        {
+            return Err(AppErrorDto::placement(
+                operation_id,
+                "Placement.Overlap",
+                "调整后的 U 位存在设备重叠",
+                rack_id,
+                start_u,
+                end_u,
+                Some(conflicting_asset_id.clone()),
+            ));
+        }
+        occupied.push((placement.asset_id.clone(), start_u, end_u));
+    }
+
+    let changed_at = now();
+    for (asset_id, _, _) in &requested_moves {
+        let current = &current_by_asset[asset_id];
+        sqlx::query(
+            "UPDATE rack_placements SET removed_at = ? WHERE id = ? AND removed_at IS NULL",
+        )
+        .bind(&changed_at)
+        .bind(&current.id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    }
+
+    let mut placements = Vec::with_capacity(requested_moves.len());
+    for (asset_id, rack_id, start_u) in requested_moves {
+        let current = &current_by_asset[&asset_id];
+        let placement_id = id();
+        let end_u = start_u + current.height_u - 1;
+        sqlx::query(
+            "INSERT INTO rack_placements (id, rack_id, asset_id, start_u, height_u, placed_at, removed_at) VALUES (?, ?, ?, ?, ?, ?, NULL)",
+        )
+        .bind(&placement_id)
+        .bind(&rack_id)
+        .bind(&asset_id)
+        .bind(start_u)
+        .bind(current.height_u)
+        .bind(&changed_at)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        placements.push(PlacementDto {
+            id: placement_id,
+            rack_id,
+            asset_id,
+            start_u,
+            end_u,
+            height_u: current.height_u,
+            placed_at: changed_at.clone(),
+        });
+    }
+
+    transaction
+        .commit()
+        .await
+        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    Ok(MoveAssetsResultDto { placements })
+}
+
 pub async fn unplace_asset(
     pool: &SqlitePool,
     input: UnplaceAssetInput,
@@ -1308,17 +1544,17 @@ pub async fn seed_dev_data(
 mod tests {
     use crate::{
         dto::{
-            CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput, MoveAssetInput,
-            PlaceAssetInput, ReorderRacksInput, UnplaceAssetInput, UpdateAreaInput,
-            UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
+            AssetPlacementMoveInput, CreateAreaInput, CreateAssetInput, CreateRackInput,
+            CreateRoomInput, MoveAssetInput, MoveAssetsInput, PlaceAssetInput, ReorderRacksInput,
+            UnplaceAssetInput, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
         },
         state::AppState,
     };
 
     use super::{
         create_area, create_asset, create_rack, create_room, get_rack_view, list_assets,
-        list_locations, list_racks, move_asset, place_asset, reorder_racks, seed_dev_data,
-        unplace_asset, update_area, update_asset, update_rack, update_room,
+        list_locations, list_racks, move_asset, move_assets, place_asset, reorder_racks,
+        seed_dev_data, unplace_asset, update_area, update_asset, update_rack, update_room,
     };
 
     async fn fixture() -> AppState {
@@ -1576,6 +1812,103 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(history_count, 2);
+    }
+
+    #[tokio::test]
+    async fn moves_multiple_assets_atomically_and_allows_position_swaps() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let assets = list_assets(&state.pool, "op").await.unwrap();
+        let first = assets
+            .iter()
+            .find(|asset| asset.name == "计算节点 01")
+            .unwrap();
+        let second = assets
+            .iter()
+            .find(|asset| asset.name == "核心交换机")
+            .unwrap();
+        let first_placement = first.placement.as_ref().unwrap();
+        let second_placement = second.placement.as_ref().unwrap();
+
+        let result = move_assets(
+            &state.pool,
+            MoveAssetsInput {
+                moves: vec![
+                    AssetPlacementMoveInput {
+                        asset_id: first.id.clone(),
+                        rack_id: second_placement.rack_id.clone(),
+                        start_u: second_placement.start_u,
+                    },
+                    AssetPlacementMoveInput {
+                        asset_id: second.id.clone(),
+                        rack_id: first_placement.rack_id.clone(),
+                        start_u: first_placement.start_u,
+                    },
+                ],
+            },
+            "op",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.placements.len(), 2);
+        let refreshed = list_assets(&state.pool, "op").await.unwrap();
+        let moved_first = refreshed.iter().find(|asset| asset.id == first.id).unwrap();
+        let moved_second = refreshed
+            .iter()
+            .find(|asset| asset.id == second.id)
+            .unwrap();
+        assert_eq!(
+            moved_first.placement.as_ref().unwrap().start_u,
+            second_placement.start_u
+        );
+        assert_eq!(
+            moved_second.placement.as_ref().unwrap().start_u,
+            first_placement.start_u
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_overlapping_batch_and_preserves_every_original_position() {
+        let state = fixture().await;
+        seed_dev_data(&state.pool, "op").await.unwrap();
+        let before = list_assets(&state.pool, "op").await.unwrap();
+        let moving = ["计算节点 01", "核心交换机"]
+            .iter()
+            .map(|name| before.iter().find(|asset| asset.name == *name).unwrap())
+            .collect::<Vec<_>>();
+        let rack_id = moving[0].placement.as_ref().unwrap().rack_id.clone();
+
+        let error = move_assets(
+            &state.pool,
+            MoveAssetsInput {
+                moves: moving
+                    .iter()
+                    .map(|asset| AssetPlacementMoveInput {
+                        asset_id: asset.id.clone(),
+                        rack_id: rack_id.clone(),
+                        start_u: 20,
+                    })
+                    .collect(),
+            },
+            "op",
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, "Placement.Overlap");
+
+        let after = list_assets(&state.pool, "op").await.unwrap();
+        for original in moving {
+            let current = after.iter().find(|asset| asset.id == original.id).unwrap();
+            let current_placement = current.placement.as_ref().unwrap();
+            let original_placement = original.placement.as_ref().unwrap();
+            assert_eq!(
+                current_placement.placement_id,
+                original_placement.placement_id
+            );
+            assert_eq!(current_placement.rack_id, original_placement.rack_id);
+            assert_eq!(current_placement.start_u, original_placement.start_u);
+        }
     }
 
     #[tokio::test]

@@ -8,7 +8,14 @@ import {
 } from "react"
 
 import type { RackCanvasDto, RackPlacementViewDto } from "@/shared/lib/tauri-client/bindings"
-import { U_HEIGHT, placementGeometry, reorderRackIds } from "./layout"
+import {
+  U_HEIGHT,
+  deviceGrabOffset,
+  droppedDeviceStartU,
+  placementGeometry,
+  reorderRackIds,
+} from "./layout"
+import { validatePlacementTarget } from "./placement-draft"
 import "./rack-canvas.css"
 
 export function RackCanvas({
@@ -16,17 +23,38 @@ export function RackCanvas({
   selectedAssetId,
   onSelectAsset,
   onReorderRacks,
+  onMoveAsset,
+  onEditStart,
+  draftAssetIds,
+  isLayoutEditing,
+  isLayoutSaving,
   isReordering,
 }: {
   racks: RackCanvasDto[]
   selectedAssetId: string | null
   onSelectAsset: (asset: RackPlacementViewDto) => void
   onReorderRacks: (rackIds: string[]) => Promise<void>
+  onMoveAsset: (move: { assetId: string; rackId: string; startU: number }) => void
+  onEditStart: () => void
+  draftAssetIds: string[]
+  isLayoutEditing: boolean
+  isLayoutSaving: boolean
   isReordering: boolean
 }) {
   const rackIds = useMemo(() => racks.map(({ rack }) => rack.id), [racks])
   const [orderedRackIds, setOrderedRackIds] = useState(rackIds)
   const [draggedRackId, setDraggedRackId] = useState<string | null>(null)
+  const [draggedAsset, setDraggedAsset] = useState<{
+    placement: RackPlacementViewDto
+    grabOffsetU: number
+  } | null>(null)
+  const [deviceDropTarget, setDeviceDropTarget] = useState<{
+    rackId: string
+    startU: number
+    endU: number
+    valid: boolean
+    message: string | null
+  } | null>(null)
   const [dropTarget, setDropTarget] = useState<{
     rackId: string
     position: "before" | "after"
@@ -35,6 +63,7 @@ export function RackCanvas({
     () => new Map(racks.map((rack) => [rack.rack.id, rack])),
     [racks],
   )
+  const draftAssetIdSet = useMemo(() => new Set(draftAssetIds), [draftAssetIds])
 
   const commitOrder = async (nextOrder: string[]) => {
     if (
@@ -87,6 +116,50 @@ export function RackCanvas({
     }
   }
 
+  const handleDeviceDragOver = (event: DragEvent<HTMLDivElement>, rack: RackCanvasDto) => {
+    if (!draggedAsset || isLayoutSaving) return
+    event.preventDefault()
+    event.stopPropagation()
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const startU = droppedDeviceStartU(
+      event.clientY,
+      bounds.top,
+      bounds.height,
+      rack.rack.totalU,
+      draggedAsset.placement.heightU,
+      draggedAsset.grabOffsetU,
+    )
+    const target = validatePlacementTarget(
+      racks,
+      draggedAsset.placement.assetId,
+      rack.rack.id,
+      startU,
+      draggedAsset.placement.heightU,
+    )
+    event.dataTransfer.dropEffect = target.valid ? "move" : "none"
+    setDeviceDropTarget({
+      rackId: rack.rack.id,
+      startU,
+      endU: target.endU,
+      valid: target.valid,
+      message: target.message,
+    })
+  }
+
+  const handleDeviceDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!draggedAsset || !deviceDropTarget) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (deviceDropTarget.valid) {
+      onMoveAsset({
+        assetId: draggedAsset.placement.assetId,
+        rackId: deviceDropTarget.rackId,
+        startU: deviceDropTarget.startU,
+      })
+    }
+    setDeviceDropTarget(null)
+  }
+
   return (
     <div
       className="rack-stage flex min-h-full min-w-max items-center p-6 lg:p-8"
@@ -111,8 +184,8 @@ export function RackCanvas({
                 <button
                   type="button"
                   className="rack-drag-handle"
-                  draggable={!isReordering}
-                  disabled={isReordering}
+                  draggable={!isReordering && !isLayoutEditing}
+                  disabled={isReordering || isLayoutEditing}
                   aria-label={`调整机柜 ${rack.code} 的顺序`}
                   title="拖动调整顺序；也可使用左右方向键"
                   onDragStart={(event) => {
@@ -136,7 +209,13 @@ export function RackCanvas({
                 </button>
               </header>
               <div className="rack-cap" aria-hidden="true" />
-              <div className="rack-body" style={{ height: rack.totalU * U_HEIGHT }}>
+              <div
+                className="rack-body"
+                data-device-drop={deviceDropTarget?.rackId === rack.id ? (deviceDropTarget.valid ? "valid" : "invalid") : undefined}
+                style={{ height: rack.totalU * U_HEIGHT }}
+                onDragOver={(event) => handleDeviceDragOver(event, rackCanvas)}
+                onDrop={handleDeviceDrop}
+              >
                 <div className="rack-grid" aria-hidden="true" />
                 {Array.from({ length: rack.totalU }, (_, index) => index + 1).map((unit) => (
                   <span
@@ -154,12 +233,34 @@ export function RackCanvas({
                     <button
                       type="button"
                       className="rack-device"
+                      draggable={!isLayoutSaving}
+                      data-draft={draftAssetIdSet.has(placement.assetId)}
+                      data-dragging={draggedAsset?.placement.assetId === placement.assetId}
                       data-selected={placement.assetId === selectedAssetId}
                       key={placement.placementId}
                       style={{ bottom: geometry.bottom, height: geometry.height } as CSSProperties}
                       title={`${placement.name} · U${placement.startU}–U${placement.endU}`}
                       aria-label={`${placement.name}，U${placement.startU} 到 U${placement.endU}`}
                       onClick={() => onSelectAsset(placement)}
+                      onDragStart={(event) => {
+                        const bounds = event.currentTarget.getBoundingClientRect()
+                        event.dataTransfer.effectAllowed = "move"
+                        event.dataTransfer.setData("application/x-uframe-asset", placement.assetId)
+                        setDraggedAsset({
+                          placement,
+                          grabOffsetU: deviceGrabOffset(
+                            event.clientY,
+                            bounds.top,
+                            bounds.height,
+                            placement.heightU,
+                          ),
+                        })
+                        onEditStart()
+                      }}
+                      onDragEnd={() => {
+                        setDraggedAsset(null)
+                        setDeviceDropTarget(null)
+                      }}
                     >
                       <span className="rack-device-handle" aria-hidden="true" />
                       <span className="rack-device-label">{placement.name}</span>
@@ -167,6 +268,19 @@ export function RackCanvas({
                     </button>
                   )
                 })}
+                {deviceDropTarget?.rackId === rack.id && draggedAsset ? (
+                  <div
+                    className="rack-device-drop-preview"
+                    data-valid={deviceDropTarget.valid}
+                    style={placementGeometry(deviceDropTarget.startU, draggedAsset.placement.heightU) as CSSProperties}
+                    aria-hidden="true"
+                  >
+                    <span>U{deviceDropTarget.startU}–U{deviceDropTarget.endU}</span>
+                    {deviceDropTarget.message ? (
+                      <span className="rack-device-drop-tooltip">{deviceDropTarget.message}</span>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div className="rack-foot" aria-hidden="true" />
             </section>

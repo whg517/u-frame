@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.8 |
-| 更新日期 | 2026-09-06 |
+| 版本 | v0.9 |
+| 更新日期 | 2026-09-07 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
 | 关联文档 | [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [开发规范](DEVELOPMENT_GUIDE.md) |
@@ -182,7 +182,10 @@ src/
 - 缩放范围固定为 50%–160%，由页面本地状态管理；缩放不写入数据库。
 - 设备块位置由 `startU` 和 `heightU` 计算，不保存像素坐标。
 - 多机柜采用横向或二维虚拟化；只渲染可视区域和少量缓冲区。
-- 设备选中后打开详情侧栏；上架和移动通过表单完成，不实现设备拖拽。
+- 普通模式下选中设备打开详情侧栏；已上架设备可在画布中拖动，首次拖动自动进入布局编辑模式。
+- 布局编辑模式使用 React 页面本地草稿投影，按设备 ID 记录目标机柜和 `startU`；取消直接丢弃草稿，不执行 IPC。
+- 拖动过程根据指针位置、当前缩放和抓取偏移计算目标 U 位，并针对草稿投影实时检查越界与重叠。
+- 设备布局编辑期间禁用机柜排序拖动，保留缩放；保存成功或取消后恢复普通画布交互。
 - 机柜标题作为拖动手柄，前端乐观更新顺序，保存失败回滚；同时提供左右方向键操作。
 - 前端只提交当前画布内完整的机柜 ID 顺序；后端在事务中将该顺序写入当前全局顺序槽，保留筛选范围外机柜的相对顺序。
 - 机柜和设备在同一 DOM 树中整体缩放，确保 U 位刻度与设备块不会产生比例漂移。
@@ -195,6 +198,7 @@ src/
 - 机柜和设备列表行是主导航目标，支持指针点击和键盘 Enter；行内按钮要停止事件传播。
 - 上架和移动页从 `get_rack_view` 投影派生能容纳设备高度的连续空闲范围，不建立第二份占用状态。
 - 前端在输入时显示最终范围和冲突设备；Rust 应用层和 SQLite 事务边界重新执行边界、重叠和唯一活动放置校验。
+- 画布批量保存提交设备的最终机柜和 `startU`；Rust 在单一事务中读取全部活动放置，先验证完整最终布局，再结束旧放置并创建新放置，因此支持多设备联动调整且任一失败整体回滚。
 
 ## 6. Rust 后端设计
 
@@ -245,7 +249,7 @@ SQLite 建议配置：
 | locations | `list_locations`、`create_room`、`update_room`、`create_area`、`update_area`、`archive_location` |
 | racks | `list_racks`、`get_rack_view`、`create_rack`、`reorder_racks`、`update_rack`、`archive_rack` |
 | assets | `list_assets`、`get_asset`、`create_asset`、`update_asset`、`archive_asset` |
-| placements | `place_asset`、`move_asset`、`unplace_asset` |
+| placements | `place_asset`、`move_asset`、`move_assets`、`unplace_asset` |
 | imports | `preview_asset_import`、`apply_asset_import`、`get_import_job` |
 | exports | `export_assets` |
 | backups | `create_backup`、`inspect_backup`、`restore_backup` |
@@ -411,7 +415,7 @@ COMMIT
 
 任何一步失败都回滚。移动操作不能拆成“先下架、后上架”两个独立事务，否则中间失败会丢失原位置。
 
-当前 `move_asset` 在同一 SQLite 事务中结束原放置并创建新放置，冲突、越界、目标未变或写入失败都不会改变原位置。`unplace_asset` 只为当前放置写入结束时间，保留历史行。`audit_logs` 写入和历史查询尚未实现，仍是后续交付项。
+当前 `move_asset` 在同一 SQLite 事务中结束原放置并创建新放置，冲突、越界、目标未变或写入失败都不会改变原位置。`move_assets` 使用单一事务校验并写入整批最终布局，允许请求内设备交换或联动移位，任一无效目标使整批回滚。`unplace_asset` 只为当前放置写入结束时间，保留历史行。`audit_logs` 写入和历史查询尚未实现，仍是后续交付项。
 
 ### 8.2 Excel 导入
 
@@ -584,7 +588,7 @@ pnpm tauri build --bundles dmg
 
 Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目录、最小权限、前端 lint/测试和 Rust 测试。后续差距包括：
 
-- 归档、审计和历史查询尚未实现；移动与下架核心事务已交付。
+- 归档、审计和历史查询尚未实现；单设备移动、下架与画布批量调整事务已交付。
 - 可视区域虚拟化及 100 台机柜性能验证尚未实现。
 - Excel、导出、备份和恢复适配器尚未实现。
 - 远程 CI、签名、公证和安装包发布门禁尚未建立。
@@ -612,3 +616,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.6 | 2026-09-04 | 记录位置、机柜和资产详情路由、现有查询投影复用及跨实体深链。 |
 | v0.7 | 2026-09-05 | 记录四类实体编辑命令、编辑完整性 trigger，以及画布机房/区域多选 URL 筛选方案。 |
 | v0.8 | 2026-09-06 | 记录安全返回路由、上下文预选、受控筛选弹层、台账导航、放置引导及原子移动/下架实现。 |
+| v0.9 | 2026-09-07 | 记录机柜画布设备拖动草稿、自动编辑模式和 `move_assets` 原子批量保存实现。 |

@@ -4,9 +4,10 @@ use crate::{
     application,
     dto::{
         AreaDto, AssetDto, CreateAreaInput, CreateAssetInput, CreateRackInput, CreateRoomInput,
-        LocationTreeDto, MoveAssetInput, PlaceAssetInput, PlacementDto, RackDto, RackViewDto,
-        ReorderRacksInput, ReorderRacksResultDto, RoomDto, UnplaceAssetInput,
-        UnplaceAssetResultDto, UpdateAreaInput, UpdateAssetInput, UpdateRackInput, UpdateRoomInput,
+        LocationTreeDto, MoveAssetInput, MoveAssetsInput, MoveAssetsResultDto, PlaceAssetInput,
+        PlacementDto, RackDto, RackViewDto, ReorderRacksInput, ReorderRacksResultDto, RoomDto,
+        UnplaceAssetInput, UnplaceAssetResultDto, UpdateAreaInput, UpdateAssetInput,
+        UpdateRackInput, UpdateRoomInput,
     },
     error::{AppErrorDto, operation_id},
     state::AppState,
@@ -137,6 +138,16 @@ pub async fn move_asset(
 ) -> Result<PlacementDto, AppErrorDto> {
     let operation_id = operation_id();
     application::move_asset(&state.pool, input, &operation_id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn move_assets(
+    state: State<'_, AppState>,
+    input: MoveAssetsInput,
+) -> Result<MoveAssetsResultDto, AppErrorDto> {
+    let operation_id = operation_id();
+    application::move_assets(&state.pool, input, &operation_id).await
 }
 
 #[tauri::command]

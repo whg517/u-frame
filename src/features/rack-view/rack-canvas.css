@@ -171,6 +171,23 @@
   text-align: left;
 }
 
+.rack-device[draggable="true"] {
+  cursor: grab;
+}
+
+.rack-device[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.rack-device[data-dragging="true"] {
+  opacity: 0.35;
+}
+
+.rack-device[data-draft="true"] {
+  border-style: dashed;
+  background: color-mix(in oklch, var(--primary) 18%, var(--background));
+}
+
 .rack-device:hover,
 .rack-device[data-selected="true"] {
   outline: 1px solid var(--foreground);
@@ -192,6 +209,44 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rack-device-drop-preview {
+  position: absolute;
+  right: 13px;
+  left: 13px;
+  z-index: 4;
+  display: grid;
+  min-height: 12px;
+  place-items: center;
+  border: 1px dashed var(--foreground);
+  background: color-mix(in oklch, var(--primary) 24%, transparent);
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.rack-device-drop-preview[data-valid="false"] {
+  border-color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive) 20%, transparent);
+  color: var(--destructive);
+}
+
+.rack-device-drop-tooltip {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  width: max-content;
+  max-width: 220px;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in oklch, var(--destructive) 45%, transparent);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--destructive);
+  font-family: inherit;
+  font-size: 10px;
+  transform: translateX(-50%);
 }
 
 .rack-foot {

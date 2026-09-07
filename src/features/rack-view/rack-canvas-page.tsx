@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus } from "lucide-react"
-import { useState, type CSSProperties, type WheelEvent } from "react"
+import { PencilRuler, Plus, Save, X } from "lucide-react"
+import { useMemo, useState, type CSSProperties, type WheelEvent } from "react"
 import { Link, useLocation, useSearchParams } from "react-router"
 
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { workspaceHeaderHeightClass } from "@/shared/components/page"
 import { EmptyState } from "@/shared/components/empty-state"
 import { errorMessage } from "@/shared/lib/errors"
 import { queryKeys } from "@/shared/lib/query-keys"
+import type { AssetPlacementMoveInput } from "@/shared/lib/tauri-client/bindings"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { currentRoute, routeWithParams } from "@/shared/lib/navigation-context"
 import { useLocations } from "@/features/locations/queries"
@@ -16,6 +17,7 @@ import { CanvasZoomControls } from "./canvas-zoom-controls"
 import { CANVAS_ZOOM_STEP, clampCanvasZoom } from "./layout"
 import { filterRackCanvases, replaceFilterValues } from "./filters"
 import { MultiSelectFilter } from "./multi-select-filter"
+import { applyPlacementMoves, updatePlacementMoves } from "./placement-draft"
 import { RackCanvas } from "./rack-canvas"
 import "./rack-canvas.css"
 
@@ -23,6 +25,8 @@ export function RackCanvasPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [zoom, setZoom] = useState(1)
   const [openFilter, setOpenFilter] = useState<"room" | "area" | null>(null)
+  const [isLayoutEditing, setIsLayoutEditing] = useState(false)
+  const [draftMoves, setDraftMoves] = useState<AssetPlacementMoveInput[]>([])
   const location = useLocation()
   const queryClient = useQueryClient()
   const roomIds = searchParams.getAll("room")
@@ -42,6 +46,17 @@ export function RackCanvasPage() {
       ])
     },
   })
+  const saveLayout = useMutation({
+    mutationFn: () => tauriClient.moveAssets({ moves: draftMoves }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.assets }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.rackViewRoot }),
+      ])
+      setDraftMoves([])
+      setIsLayoutEditing(false)
+    },
+  })
   const rooms = locations.data?.rooms.map(({ room }) => room) ?? []
   const areas = locations.data?.rooms.flatMap(({ room, areas }) => areas.map((area) => ({
     ...area,
@@ -51,7 +66,11 @@ export function RackCanvasPage() {
   const visibleAreas = roomIds.length === 0
     ? areas
     : areas.filter((area) => roomIds.includes(area.roomId))
-  const visibleRacks = filterRackCanvases(view.data?.racks ?? [], roomIds, areaIds)
+  const projectedRacks = useMemo(
+    () => applyPlacementMoves(view.data?.racks ?? [], draftMoves),
+    [draftMoves, view.data?.racks],
+  )
+  const visibleRacks = filterRackCanvases(projectedRacks, roomIds, areaIds)
   const origin = currentRoute(location.pathname, location.search)
   const contextualAreaId = areaIds.length === 1
     ? areaIds[0]
@@ -104,13 +123,30 @@ export function RackCanvasPage() {
     updateZoom(event.deltaY > 0 ? -CANVAS_ZOOM_STEP : CANVAS_ZOOM_STEP)
   }
 
+  const beginLayoutEdit = () => {
+    if (isLayoutEditing) return
+    setIsLayoutEditing(true)
+    setOpenFilter(null)
+    const next = new URLSearchParams(searchParams)
+    next.delete("highlight")
+    setSearchParams(next, { replace: true })
+  }
+
+  const cancelLayoutEdit = () => {
+    setDraftMoves([])
+    setIsLayoutEditing(false)
+    saveLayout.reset()
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <header className={`${workspaceHeaderHeightClass} flex shrink-0 items-center justify-between gap-6 border-b px-5 lg:px-6`}>
         <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="shrink-0 text-lg font-semibold tracking-tight">机柜一览</h1>
           <p className="hidden truncate text-xs text-muted-foreground lg:block">
-            正面 U 位 · 顶部为最大 U，底部为 U1
+            {isLayoutEditing
+              ? `布局编辑中 · ${draftMoves.length > 0 ? `已调整 ${draftMoves.length} 台设备` : "拖动设备调整位置"}`
+              : "正面 U 位 · 顶部为最大 U，底部为 U1"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -120,7 +156,7 @@ export function RackCanvasPage() {
             options={rooms.map((room) => ({ value: room.id, label: room.name, description: room.code }))}
             values={roomIds}
             onChange={updateRooms}
-            disabled={locations.isPending || locations.isError}
+            disabled={locations.isPending || locations.isError || isLayoutEditing}
             open={openFilter === "room"}
             onOpenChange={(open) => setOpenFilter(open ? "room" : null)}
           />
@@ -130,18 +166,34 @@ export function RackCanvasPage() {
             options={visibleAreas.map((area) => ({ value: area.id, label: area.name, description: `${area.roomName} · ${area.code}` }))}
             values={areaIds}
             onChange={updateAreas}
-            disabled={locations.isPending || locations.isError}
+            disabled={locations.isPending || locations.isError || isLayoutEditing}
             open={openFilter === "area"}
             onOpenChange={(open) => setOpenFilter(open ? "area" : null)}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            nativeButton={false}
-            render={<Link to={createRackPath} />}
-          >
-            <Plus /> 新建机柜
-          </Button>
+          {isLayoutEditing ? (
+            <>
+              <Button variant="outline" size="sm" disabled={saveLayout.isPending} onClick={cancelLayoutEdit}>
+                <X /> 取消
+              </Button>
+              <Button size="sm" disabled={draftMoves.length === 0 || saveLayout.isPending} onClick={() => saveLayout.mutate()}>
+                <Save /> {saveLayout.isPending ? "正在保存…" : "保存调整"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={beginLayoutEdit}>
+                <PencilRuler /> 编辑布局
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={<Link to={createRackPath} />}
+              >
+                <Plus /> 新建机柜
+              </Button>
+            </>
+          )}
         </div>
       </header>
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -186,8 +238,16 @@ export function RackCanvasPage() {
                   racks={visibleRacks}
                   selectedAssetId={selectedAssetId}
                   isReordering={reorder.isPending}
+                  isLayoutEditing={isLayoutEditing}
+                  isLayoutSaving={saveLayout.isPending}
+                  draftAssetIds={draftMoves.map((move) => move.assetId)}
+                  onEditStart={beginLayoutEdit}
+                  onMoveAsset={(move) => {
+                    setDraftMoves((current) => updatePlacementMoves(view.data?.racks ?? [], current, move))
+                  }}
                   onReorderRacks={(rackIds) => reorder.mutateAsync(rackIds).then(() => undefined)}
                   onSelectAsset={(asset) => {
+                    if (isLayoutEditing) return
                     const next = new URLSearchParams(searchParams)
                     next.set("highlight", asset.assetId)
                     setSearchParams(next)
@@ -196,9 +256,9 @@ export function RackCanvasPage() {
               </div>
             )}
           </div>
-          {reorder.isError ? (
+          {reorder.isError || saveLayout.isError ? (
             <div className="rack-canvas-message" role="alert">
-              {errorMessage(reorder.error)}
+              {errorMessage(reorder.error ?? saveLayout.error)}
             </div>
           ) : null}
           <CanvasZoomControls
@@ -208,7 +268,7 @@ export function RackCanvasPage() {
             onZoomIn={() => updateZoom(CANVAS_ZOOM_STEP)}
           />
         </div>
-        {selection ? (
+        {selection && !isLayoutEditing ? (
           <DeviceInspector
             placement={selection.placement}
             rack={selection.rack}

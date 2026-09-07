@@ -6,6 +6,7 @@ import {
   type CreateRackInput,
   type CreateRoomInput,
   type MoveAssetInput,
+  type MoveAssetsInput,
   type PlaceAssetInput,
   type ReorderRacksInput,
   type UpdateAreaInput,
@@ -56,6 +57,7 @@ export const tauriClient = {
   updateAsset: (input: UpdateAssetInput) => unwrap(commands.updateAsset(input)),
   placeAsset: (input: PlaceAssetInput) => unwrap(commands.placeAsset(input)),
   moveAsset: (input: MoveAssetInput) => unwrap(commands.moveAsset(input)),
+  moveAssets: (input: MoveAssetsInput) => unwrap(commands.moveAssets(input)),
   unplaceAsset: (input: UnplaceAssetInput) => unwrap(commands.unplaceAsset(input)),
   getRackView: (areaId: string | null = null) =>
     unwrap(commands.getRackView(areaId)),
