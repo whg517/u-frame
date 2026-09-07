@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.9 |
+| 版本 | v0.10 |
 | 更新日期 | 2026-09-07 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
@@ -45,6 +45,7 @@
 | 前端 | React 19 + TypeScript strict | 已采用 | 当前项目已初始化。 |
 | 构建 | Vite 7 | 已采用 | 当前项目已初始化。 |
 | 包管理 | pnpm 11.10.0 | 已采用 | 由 `packageManager` 固定版本。 |
+| 工具链 | Node.js 24.20.0 + Rust 1.98.1 | 已采用 | 由 `.node-version` 和 `rust-toolchain.toml` 固定。 |
 | Rust | Rust 2024 edition | 已采用 | 当前 Cargo 工程配置。 |
 | 本地数据库 | SQLite | 已采用 | 数据文件位于 macOS 应用数据目录。 |
 | SQLite 访问 | SQLx 0.9 SQLite | 已采用 | 异步访问与内嵌迁移，见 [ADR-001](adr/0001-sqlx-sqlite.md)。 |
@@ -54,6 +55,8 @@
 | UI 基础 | Tailwind CSS 4 + shadcn Base UI | 已采用 | 使用系统主题和本地组件源码，见 [ADR-003](adr/0003-shadcn-base-ui.md)。 |
 | Excel 处理 | Rust 侧解析与生成 | 待 ADR | 解析、字段匹配和正式写入均留在可信后端。 |
 | IPC 类型共享 | tauri-specta 生成 TypeScript bindings | 已采用 | RC 版本精确锁定并由门禁检查漂移，见 [ADR-002](adr/0002-tauri-specta-bindings.md)。 |
+| 持续集成 | GitHub Actions macOS `quality-gate` | 已采用 | PR 和 `main` 使用同一 `pnpm gate`，见 [ADR-006](adr/0006-github-delivery-pipeline.md)。 |
+| macOS 发行 | Universal DMG + Developer ID + notarization | 已采用 | 发布 workflow 已建立，首个签名发行待 Apple 凭据和真实安装验收，见 [ADR-005](adr/0005-macos-universal-distribution.md)。 |
 
 任何“拟采用”或“待 ADR”条目都不代表依赖已经安装。
 
@@ -530,7 +533,7 @@ React WebView 输入、Excel 内容、备份文件和用户选择的路径均视
 pnpm gate
 ```
 
-当前 `pnpm gate` 执行 Git 空白检查、Shell 语法检查、文档检查、bindings 漂移检查、前端 ESLint、TypeScript、Vitest 与构建，以及 Rust 格式、Debug/Release Clippy 和全量测试。远程 CI 尚未配置。DMG 构建属于发布门禁，不在每次提交时执行。
+当前 `pnpm gate` 执行 Git 空白检查、Shell 语法检查、递归文档检查、三处应用版本一致性、bindings 漂移检查、前端 ESLint、TypeScript、Vitest 与构建，以及 Rust 格式、Debug/Release Clippy 和全量测试。GitHub `quality-gate` 在 macOS runner 执行同一入口。Universal DMG、签名和公证属于发布门禁，不在每次提交时执行。
 
 ## 12. 日志与审计
 
@@ -554,16 +557,34 @@ pnpm tauri dev
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm tauri build --bundles dmg
+pnpm gate
+pnpm release:build
 ```
 
-正式对外分发前需要完成：
+已采用的发布链为：
 
-- 设置真实应用描述、作者、版权和图标。
-- 使用 Developer ID Application 证书签名。
-- 完成 Apple notarization，并验证 DMG 安装和首次启动。
-- 分别构建和验证 Apple Silicon 与 Intel 产物，或形成 Universal Binary 决策。
-- 发布前执行全量数据迁移、导入、备份与恢复回归测试。
+```text
+main 上的版本提交
+  → annotated SemVer tag
+    → GitHub release environment
+      → 完整门禁
+        → Universal app + DMG
+          → Developer ID 签名 + Apple notarization
+            → codesign / stapler / SHA-256 验证
+              → Draft Release
+                → Intel + Apple Silicon 安装验收
+                  → 人工发布
+```
+
+正式对外分发必须：
+
+- 三处应用版本与 tag 一致，tag 对应 `main` 中的不可变提交。
+- 使用 Developer ID Application 证书签名，完成 Apple notarization 和 staple 验证。
+- 使用 Universal Binary 同时支持 Apple Silicon 与 Intel，并分别完成真实安装启动验收。
+- 生成 SHA-256 摘要，Draft Release 中只上传流水线验证的制品。
+- 执行当前发布范围的数据库迁移、核心业务、主题和窗口回归；导入、备份和审计上线后再加入必测矩阵。
+
+详细操作、凭据、故障与回滚见 [发布规范](RELEASING.md)；架构和流水线决策见 [ADR-005](adr/0005-macos-universal-distribution.md) 和 [ADR-006](adr/0006-github-delivery-pipeline.md)。
 
 ## 14. 实施顺序
 
@@ -574,7 +595,7 @@ pnpm tauri build --bundles dmg
 5. 已实现网格多机柜画布、50%–160% 缩放、机柜顺序持久化和设备详情交互；虚拟化留待后续切片。
 6. 实现导入 staging、差异预览、确认应用和导出。
 7. 实现审计、备份、恢复和迁移兼容测试。
-8. 配置质量门禁、macOS 签名、公证和安装验证。
+8. 已配置 GitHub 质量门禁和 macOS Universal 签名公证流水线；Apple 凭据配置和首个发行安装验收待执行。
 
 ## 15. ADR 待办
 
@@ -582,7 +603,8 @@ pnpm tauri build --bundles dmg
 |---|---|---|---|
 | ADR-003 | 一致性备份实现 | SQLite Backup API / `VACUUM INTO` | M4 开始前 |
 | ADR-004 | Excel 解析和生成库 | Rust 生态候选库实测比较 | M3 开始前 |
-| ADR-005 | macOS 架构产物 | 双架构独立 DMG / Universal Binary | 发布前 |
+| [ADR-005](adr/0005-macos-universal-distribution.md) | macOS 架构产物 | 采用 Universal app + DMG | 已完成 |
+| [ADR-006](adr/0006-github-delivery-pipeline.md) | GitHub 集成和发行流水线 | 主线 PR 门禁 + tag 驱动 Draft Release | 已完成 |
 
 ## 16. 当前脚手架差距
 
@@ -591,7 +613,7 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 - 归档、审计和历史查询尚未实现；单设备移动、下架与画布批量调整事务已交付。
 - 可视区域虚拟化及 100 台机柜性能验证尚未实现。
 - Excel、导出、备份和恢复适配器尚未实现。
-- 远程 CI、签名、公证和安装包发布门禁尚未建立。
+- GitHub CI 和发布 workflow 已建立；Apple 签名凭据、首个 Draft Release 及 Intel/Apple Silicon 安装验收尚未执行。
 
 ## 17. 参考资料
 
@@ -603,6 +625,9 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 - [SQLite：Online Backup API](https://www.sqlite.org/backup.html)
 - [SQLite：VACUUM INTO](https://www.sqlite.org/lang_vacuum.html)
 - [Tauri：macOS 签名与公证](https://v2.tauri.app/distribute/sign/macos/)
+- [Tauri：GitHub Actions 发布](https://v2.tauri.app/distribute/pipelines/github/)
+- [GitHub Actions 安全加固](https://docs.github.com/en/code-security/tutorials/secure-your-organization/protect-against-threats)
+- [GitHub Immutable Releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
 
 ## 18. 变更记录
 
@@ -617,3 +642,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.7 | 2026-09-05 | 记录四类实体编辑命令、编辑完整性 trigger，以及画布机房/区域多选 URL 筛选方案。 |
 | v0.8 | 2026-09-06 | 记录安全返回路由、上下文预选、受控筛选弹层、台账导航、放置引导及原子移动/下架实现。 |
 | v0.9 | 2026-09-07 | 记录机柜画布设备拖动草稿、自动编辑模式和 `move_assets` 原子批量保存实现。 |
+| v0.10 | 2026-09-07 | 采用固定工具链、GitHub `quality-gate`、Universal DMG 以及 tag 驱动的签名公证 Draft Release 流程。 |

@@ -13,10 +13,13 @@ git diff --check
 git diff --cached --check
 
 printf '%s\n' '[gate] shell syntax'
-bash -n scripts/gate.sh .githooks/pre-commit
+bash -n scripts/gate.sh scripts/verify-macos-release.sh .githooks/pre-commit
 
 printf '%s\n' '[gate] documentation'
 pnpm docs:check
+
+printf '%s\n' '[gate] version consistency'
+pnpm version:check
 
 printf '%s\n' '[gate] generated IPC bindings'
 pnpm bindings:check
