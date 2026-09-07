@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.2 |
-| 更新日期 | 2026-09-04 |
+| 版本 | v1.3 |
+| 更新日期 | 2026-09-07 |
 | 适用范围 | UFrame 全部代码、文档和配置变更 |
 | 关联文档 | [项目协作指南](../AGENTS.md) · [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [技术设计](TECHNICAL_DESIGN.md) |
 
@@ -22,9 +22,9 @@
 
 ## 2. 当前仓库状态
 
-首次基线提交已完成，worktree 规则已全面生效。当前仓库尚未配置远程地址，因此任务从本地 `main` 创建分支；远程建立后再切换为以 `origin/main` 为基线。
+首次基线提交已完成，worktree 规则已全面生效。GitHub 远程为 `origin` / `https://github.com/whg517/u-frame.git`，新任务以最新 `origin/main` 为基线。
 
-`pnpm gate` 当前强制执行文档链接、生成 IPC bindings、一致性检查、ESLint、TypeScript、Vitest、前端构建、Rust 格式、Clippy 和 Rust 全量测试。门禁项目不得通过 `--if-present` 静默跳过。
+`pnpm gate` 当前强制执行文档链接、应用版本一致性、生成 IPC bindings、ESLint、TypeScript、Vitest、前端构建、Rust 格式、Clippy 和 Rust 全量测试。GitHub `quality-gate` 执行同一入口，门禁项目不得通过 `--if-present` 静默跳过。
 
 ## 3. 分支与 worktree
 
@@ -151,8 +151,9 @@ pnpm gate
 | 阶段 | 命令或检查 | 当前状态 |
 |---|---|---|
 | Git 空白错误 | `git diff --check`、`git diff --cached --check` | 已建立 |
-| Shell 语法 | `bash -n scripts/gate.sh .githooks/pre-commit` | 已建立 |
+| Shell 语法 | `bash -n scripts/gate.sh scripts/verify-macos-release.sh .githooks/pre-commit` | 已建立 |
 | 文档一致性 | `pnpm docs:check` | 已建立 |
+| 应用版本 | `pnpm version:check` | 已建立 |
 | 前端 lint | `pnpm lint` | 已建立 |
 | 前端测试 | `pnpm test` | 已建立 |
 | 前端类型与构建 | `pnpm build` | 已建立 |
@@ -165,7 +166,7 @@ pnpm gate
 
 ### 5.1 文档门禁
 
-`pnpm docs:check` 检查：
+`pnpm docs:check` 递归检查根目录治理文档、`docs/` 和 `.github/` 中的 Markdown：
 
 - Markdown 文件存在且非空。
 - fenced code block 成对闭合。
@@ -282,30 +283,32 @@ Squash 合并不会保留原分支祖先关系，因此 Git 可能不认为功�
 
 确认后再删除本地或远程任务分支。不得仅因 `git branch -d` 失败就直接强制删除。
 
-## 9. CI 与分支保护目标
+## 9. CI 与分支保护
 
-接入远程仓库后，应配置：
+GitHub [CI workflow](../.github/workflows/ci.yml) 在 Pull Request、`main` push 和人工触发时使用 macOS runner 执行 `pnpm gate`。稳定的 required check 名称为 `quality-gate`。
+
+仓库保护配置为：
 
 - `main` 禁止直接 push。
 - PR 必须通过 `pnpm gate` 状态检查。
-- PR 必须完成必要评审。
+- PR 必须解决全部讨论；单维护者阶段不强制外部批准。
 - 只允许 squash merge。
 - 合并后自动删除远程功能分支。
 - 禁止管理员无记录绕过门禁。
 
-这些是目标配置；当前仓库尚未建立远程 CI 和分支保护，不得报告为已经启用。
+流水线权限、Action SHA 固定、Dependabot 和安全功能见 [GitHub 项目治理](GITHUB_GOVERNANCE.md)。
 
 ## 10. 发布门禁
 
-提交门禁不等于发布验证。发布 macOS 安装包前还必须执行：
+提交门禁不等于发布验证。本地可构建 Universal 候选包：
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm gate
-pnpm tauri build --bundles dmg
+pnpm release:build
 ```
 
-并完成签名、公证、安装、首次启动、数据库迁移、Excel 导入和备份恢复验收。
+正式发行必须从 `main` 中的 annotated SemVer tag 触发 [Release workflow](../.github/workflows/release.yml)，完成 Universal 构建、Developer ID 签名、Apple notarization、staple 验证、SHA-256 摘要和 Draft Release 安装验收。详细步骤见 [发布规范](RELEASING.md)。
 
 ## 11. 变更记录
 
@@ -314,3 +317,4 @@ pnpm tauri build --bundles dmg
 | v1.0 | 2026-09-04 | 建立 worktree 开发、强制提交门禁和 squash 合并规范。 |
 | v1.1 | 2026-09-04 | 结束引导例外，记录已启用的完整本地门禁和无远程仓库时的 worktree 基线。 |
 | v1.2 | 2026-09-04 | 修正前端 lint、测试和 Rust 测试已纳入门禁的当前状态。 |
+| v1.3 | 2026-09-07 | 记录 GitHub 远程、CI required check、版本一致性门禁和 macOS Universal 签名公证发布流程。 |

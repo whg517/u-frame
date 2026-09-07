@@ -35,7 +35,8 @@ MVP 管理四类设备：
 - Iteration 005 已将画布、详情、列表和表单组成连续任务：支持安全返回原上下文、已知父级预选、详情后续动作、整行导航和 URL 搜索筛选。
 - 设备已支持原子移动和保留历史放置行的下架；上架/移动页可查看连续空闲 U 位和具体冲突对象。
 - CSP 已限制为本地资源与 Tauri IPC，默认 opener 权限已移除。
-- Excel 导入导出、备份恢复、完整审计和 CI 尚未接入。
+- GitHub CI、协作模板、Dependabot 和 macOS Universal 签名公证发布流程已建立；正式发行仍需 Apple 凭据与 Draft Release 人工验收。
+- Excel 导入导出、备份恢复和完整审计尚未接入。
 
 技术设计中的“拟采用”和“待 ADR”均为方案，不代表已经安装或落地。实现前应检查当前代码和锁文件。
 
@@ -47,6 +48,8 @@ MVP 管理四类设备：
 2. [用户故事](docs/USER_STORIES.md)：定义迭代故事、依赖和 Given/When/Then 验收标准。
 3. [技术设计文档](docs/TECHNICAL_DESIGN.md)：定义架构方案、数据设计、安全、测试和 ADR 待办。
 4. [开发规范](docs/DEVELOPMENT_GUIDE.md)：定义 worktree、提交门禁、PR 和 squash 合并流程。
+5. [GitHub 项目治理](docs/GITHUB_GOVERNANCE.md)：定义远程仓库、流水线、保护规则和 workflow 安全边界。
+6. [发布规范](docs/RELEASING.md)：定义版本、tag、macOS Universal 构建、签名、公证和 Release 验收。
 
 发生冲突时：
 
@@ -79,7 +82,9 @@ MVP 管理四类设备：
 
 ```text
 .
+├── .github/             # Actions、Dependabot 和协作模板
 ├── docs/
+├── scripts/             # 门禁、版本和发布校验
 ├── src/                 # React 前端，按 app / features / shared 分层
 ├── src-tauri/           # Rust/Tauri 应用
 ├── package.json
@@ -184,7 +189,7 @@ Tauri Command
 - 设备块按 `startU` 和 `heightU` 派生，不保存像素坐标。
 - 空闲和占用必须易于区分，设备边界必须与 U 位刻度对齐。
 - 详情通过选中态或侧栏展示，不在设备正面堆叠大量字段。
-- 设备上架和移动使用表单，不实现设备拖拽。
+- 未上架设备通过表单首次上架；已上架设备可在画布中拖动调整，并通过编辑模式统一保存。
 - 机柜标题可以作为拖动手柄调整横向画布顺序；顺序必须写入 SQLite，不能只保存在前端。
 - 画布支持 50%–160% 缩放，背景网格和机柜使用同一缩放比例。
 - 不建立背面、安装面或双面占用模型。
@@ -248,6 +253,7 @@ Tauri 权限控制不能替代 Command 内部的确定性输入校验和领域�
 ## 11. 依赖与工具链
 
 - JavaScript 包统一使用 pnpm，不混用 npm、yarn 或 bun。
+- Node.js 版本以 `.node-version` 为准，Rust 版本和必需组件以 `rust-toolchain.toml` 为准。
 - `packageManager` 字段和 `pnpm-lock.yaml` 是版本真相源。
 - Rust 依赖由 Cargo 管理并提交 `src-tauri/Cargo.lock`。
 - 新增依赖前说明用途，优先选择维护活跃、范围小、无需高权限的库。
@@ -301,7 +307,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-`pnpm gate` 已组合文档、bindings 漂移、ESLint、TypeScript、Vitest、前端构建、Rust format、Debug/Release Clippy 和 Rust 全量测试；不得绕过其中任何一项。
+`pnpm gate` 已组合文档、应用版本一致性、bindings 漂移、ESLint、TypeScript、Vitest、前端构建、Rust format、Debug/Release Clippy 和 Rust 全量测试；不得绕过其中任何一项。
 
 仅修改 Markdown 时不要求重复执行应用构建，但必须检查：
 

@@ -6,12 +6,23 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "..");
 const docsDirectory = resolve(repositoryRoot, "docs");
 
+function markdownFilesBelow(directory) {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = resolve(directory, entry.name);
+    if (entry.isDirectory()) return markdownFilesBelow(entryPath);
+    return extname(entry.name) === ".md" ? [entryPath] : [];
+  });
+}
+
 const markdownFiles = [
   resolve(repositoryRoot, "AGENTS.md"),
   resolve(repositoryRoot, "README.md"),
-  ...readdirSync(docsDirectory)
-    .filter((name) => extname(name) === ".md")
-    .map((name) => resolve(docsDirectory, name)),
+  resolve(repositoryRoot, "CHANGELOG.md"),
+  resolve(repositoryRoot, "CONTRIBUTING.md"),
+  resolve(repositoryRoot, "SECURITY.md"),
+  ...markdownFilesBelow(docsDirectory),
+  ...markdownFilesBelow(resolve(repositoryRoot, ".github")),
 ];
 
 const errors = [];
