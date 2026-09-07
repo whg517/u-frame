@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |---|---|
-| 状态 | Implemented / Verification pending |
+| 状态 | Implemented / Verified with plan limitation |
 | 日期 | 2026-09-07 |
 | 分支 | `chore/github-delivery` |
 | 范围 | 项目文档、GitHub 协作治理、CI、版本门禁和 macOS Release 流程 |
@@ -36,9 +36,14 @@
 - 校验两份 workflow、Dependabot 和 Issue Forms 的 YAML 语法。
 - 本地执行 `pnpm version:check`、Shell 语法检查和完整 `pnpm gate`。
 - squash 合并后在 `main` 再执行完整 `pnpm gate` 并推送 `origin/main`。
-- 等待首次 GitHub `CI / quality-gate` 成功，再配置并读取仓库合并、安全和 `main` 保护设置。
+- 等待首次 GitHub `CI / quality-gate` 成功，再读取仓库合并与安全设置，并尝试配置 `main` 保护；若套餐阻止启用，必须如实记录而不是把目标状态写成已完成。
 - Release workflow 只做静态契约和脚本验证；没有 Apple 凭据和真实 tag 时不得报告签名、公证或安装验收已完成。
 
 ## 5. 验收结果
 
-- 待本地门禁、远程 CI 和 GitHub 设置读取验证后补充。
+- 本地提交前完整 `pnpm gate` 通过：17 个前端测试文件共 44 个测试、17 个 Rust 测试均通过，bindings、ESLint、TypeScript、Vite build、Rust format、Clippy 和 release check 通过。
+- 版本脚本确认 `v0.1.0` 与应用版本匹配，并确认 `v0.2.0` 被稳定拒绝；GitHub workflow、Dependabot 和 Issue Forms YAML 及发布 Shell 脚本语法检查通过。
+- Pull Request [#1](https://github.com/whg517/u-frame/pull/1) 的首次远程 [CI run 34079578296](https://github.com/whg517/u-frame/actions/runs/34079578296) 在 GitHub `macos-15` 上通过，`quality-gate` 用时 4 分 4 秒。
+- 仓库已核验为 Private；已启用仅 squash merge、合并后删除分支、Actions 默认只读权限、`release` environment、Dependabot alerts 和 Dependabot security updates。
+- 已尝试设置 `main` 分支保护，但 GitHub API 返回当前个人账户套餐只支持 Public 仓库保护。仓库未擅自公开，因此 required `quality-gate`、禁止直接 push 等规则仍是待启用控制；该限制已同步写入治理与开发规范。
+- `release` environment 尚未配置 Apple secrets，本迭代未创建 tag 或 Release；因此未声称签名、公证、staple、双架构安装和正式发布已验收。

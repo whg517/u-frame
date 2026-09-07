@@ -26,15 +26,21 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 
 `main` 是唯一长期主线，必须始终可构建。日常开发使用短生命周期分支和独立 worktree，通过 Pull Request 合并。
 
-仓库设置要求：
+已应用的仓库设置：
 
-- 只允许 squash merge，禁用 merge commit 和 rebase merge。
+- 只允许 squash merge，已禁用 merge commit 和 rebase merge。
 - 合并后自动删除远程功能分支。
+- Actions 默认 `GITHUB_TOKEN` 权限为只读，且工作流不能自动批准 Pull Request。
+
+`main` 保护规则要求：
+
 - `main` 禁止强推和删除，要求线性历史。
 - 变更必须通过 Pull Request，所有讨论必须解决。
 - `quality-gate` 是必须通过的状态检查，并要求分支基于最新 `main`。
 - 单维护者阶段不强制一名外部批准，避免所有者无法批准自己的 PR；增加维护者后再启用至少一名批准者。
 - 管理员同样受保护规则约束；紧急绕过必须留下 Issue、原因和事后复盘。
+
+当前仓库为个人账户下的 Private 仓库，[GitHub Free 只为 Public 仓库提供分支保护](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)，API 也明确返回当前套餐不支持。仓库保持 Private，因此上述 `main` 规则目前是待启用控制，不得报告为已生效；在升级 GitHub Pro 或由所有者明确改为 Public 后，应立即配置并用实际 Pull Request 验证。在此之前，维护者按流程自律，不直接 push `main`，但这不是等价的技术强制。
 
 ## 4. 自动化流水线
 

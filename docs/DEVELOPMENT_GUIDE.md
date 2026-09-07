@@ -287,7 +287,7 @@ Squash 合并不会保留原分支祖先关系，因此 Git 可能不认为功�
 
 GitHub [CI workflow](../.github/workflows/ci.yml) 在 Pull Request、`main` push 和人工触发时使用 macOS runner 执行 `pnpm gate`。稳定的 required check 名称为 `quality-gate`。
 
-仓库保护配置为：
+目标仓库保护配置为：
 
 - `main` 禁止直接 push。
 - PR 必须通过 `pnpm gate` 状态检查。
@@ -296,7 +296,7 @@ GitHub [CI workflow](../.github/workflows/ci.yml) 在 Pull Request、`main` push
 - 合并后自动删除远程功能分支。
 - 禁止管理员无记录绕过门禁。
 
-流水线权限、Action SHA 固定、Dependabot 和安全功能见 [GitHub 项目治理](GITHUB_GOVERNANCE.md)。
+当前个人账户套餐无法为 Private 仓库启用分支保护；GitHub API 要求升级 Pro 或把仓库改为 Public。仓库保持 Private，因此上述保护目标尚未技术强制。现阶段仍必须走 Pull Request、等待 `quality-gate` 并使用 squash merge；升级套餐或明确公开后应立即启用保护。具体可用性依据和流水线权限、Action SHA 固定、Dependabot、安全功能见 [GitHub 项目治理](GITHUB_GOVERNANCE.md)。
 
 ## 10. 发布门禁
 
