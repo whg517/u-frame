@@ -59,7 +59,7 @@ for (const file of markdownFiles) {
   }
 }
 
-const requirementPattern = /\b(?:LOC|RACK|AST|PLC|VIEW|IMP|EXP|BAK|AUD|UX)-\d{3}\b/g;
+const requirementPattern = /\b(?:LOC|RACK|AST|PLC|VIEW|IMP|EXP|BAK|AUD|UX|SET)-\d{3}\b/g;
 const prdContent = readFileSync(resolve(docsDirectory, "PRD.md"), "utf8");
 const storiesContent = readFileSync(
   resolve(docsDirectory, "USER_STORIES.md"),

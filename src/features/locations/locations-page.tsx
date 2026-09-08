@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
+import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
 import { useLocations } from "./queries"
 
@@ -14,31 +15,31 @@ export function LocationsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title="位置管理"
-        description="按照机房和区域组织机柜。"
+        title={t("位置管理")}
+        description={t("按照机房和区域组织机柜。")}
         actions={
           <>
             <Button variant="outline" nativeButton={false} render={<Link to="/locations/areas/new" />}>
-              <Plus /> 新建区域
+              <Plus /> {t("新建区域")}
             </Button>
             <Button nativeButton={false} render={<Link to="/locations/rooms/new" />}>
-              <Plus /> 新建机房
+              <Plus /> {t("新建机房")}
             </Button>
           </>
         }
       />
       <PageBody>
         {locations.isPending ? (
-          <p className="text-sm text-muted-foreground">正在读取位置…</p>
+          <p className="text-sm text-muted-foreground">{t("正在读取位置…")}</p>
         ) : locations.isError ? (
           <p className="text-sm text-destructive">{errorMessage(locations.error)}</p>
         ) : locations.data.rooms.length === 0 ? (
           <EmptyState
-            title="还没有机房"
-            description="先创建机房，再为机房添加区域。"
+            title={t("还没有机房")}
+            description={t("先创建机房，再为机房添加区域。")}
             action={
               <Button nativeButton={false} render={<Link to="/locations/rooms/new" />}>
-                <Plus /> 创建第一个机房
+                <Plus /> {t("创建第一个机房")}
               </Button>
             }
           />
@@ -58,13 +59,13 @@ export function LocationsPage() {
                       </div>
                     </div>
                     <Button size="sm" variant="ghost" nativeButton={false} render={<Link to={`/locations/rooms/${room.id}`} />}>
-                      <Eye /> 查看
+                      <Eye /> {t("查看")}
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   {areas.length === 0 ? (
-                    <p className="px-5 py-6 text-sm text-muted-foreground">暂无区域</p>
+                    <p className="px-5 py-6 text-sm text-muted-foreground">{t("暂无区域")}</p>
                   ) : (
                     <ul className="divide-y">
                       {areas.map((area) => (

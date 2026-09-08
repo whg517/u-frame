@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router"
 import { describe, expect, it } from "vitest"
 
+import { PreferencesProvider } from "@/shared/preferences/preferences-provider"
 import { AppLayout } from "./layout"
 
 describe("AppLayout", () => {
@@ -11,15 +12,17 @@ describe("AppLayout", () => {
       defaultOptions: { queries: { retry: false } },
     })
     const { container } = render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/"]}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route index element={<p>画布内容</p>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
+      <PreferencesProvider>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/"]}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route index element={<p>画布内容</p>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </PreferencesProvider>,
     )
 
     const shell = container.querySelector('[data-slot="sidebar-wrapper"]')

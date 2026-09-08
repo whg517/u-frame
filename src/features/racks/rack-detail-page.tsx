@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DetailList, DetailMetric } from "@/shared/components/detail-list"
 import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
-import { assetStatusLabels, assetTypeLabels } from "@/shared/lib/asset-labels"
+import { t } from "@/shared/i18n/i18n"
+import { assetStatusLabel, assetTypeLabel } from "@/shared/lib/asset-labels"
 import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
@@ -25,14 +26,14 @@ export function RackDetailPage() {
     queryFn: () => tauriClient.getRackView(),
   })
 
-  if (view.isPending) return <RackDetailState title="机柜详情" message="正在读取详情…" />
-  if (view.isError) return <RackDetailState title="机柜详情" message={errorMessage(view.error)} error />
+  if (view.isPending) return <RackDetailState title={t("机柜详情")} message={t("正在读取详情…")} />
+  if (view.isError) return <RackDetailState title={t("机柜详情")} message={errorMessage(view.error)} error />
   const canvas = view.data.racks.find(({ rack }) => rack.id === rackId)
   if (!canvas) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <PageHeader title="机柜详情" actions={<BackToRacks to={returnTo} />} />
-        <PageBody><EmptyState title="没有找到这个机柜" description="机柜可能已归档，或者链接中的标识无效。" action={<BackToRacks to={returnTo} />} /></PageBody>
+        <PageHeader title={t("机柜详情")} actions={<BackToRacks to={returnTo} />} />
+        <PageBody><EmptyState title={t("没有找到这个机柜")} description={t("机柜可能已归档，或者链接中的标识无效。")} action={<BackToRacks to={returnTo} />} /></PageBody>
       </div>
     )
   }
@@ -58,10 +59,10 @@ export function RackDetailPage() {
           <>
             <BackToRacks to={returnTo} />
             <Button variant="outline" nativeButton={false} render={<Link to={`/racks/${rack.id}/edit`} />}>
-              <Pencil /> 编辑机柜
+              <Pencil /> {t("编辑机柜")}
             </Button>
             <Button nativeButton={false} render={<Link to={`/?area=${rack.areaId}`} />}>
-              <LocateFixed /> 在画布中查看
+              <LocateFixed /> {t("在画布中查看")}
             </Button>
           </>
         }
@@ -69,50 +70,50 @@ export function RackDetailPage() {
       <PageBody>
         <div className="mx-auto grid max-w-6xl gap-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <DetailMetric label="设备数量" value={placements.length} description="当前已上架设备" />
-            <DetailMetric label="已占用" value={`${occupiedU}U`} />
-            <DetailMetric label="可用容量" value={`${availableU}U`} />
-            <DetailMetric label="占用率" value={`${occupancy}%`} />
+            <DetailMetric label={t("设备数量")} value={placements.length} description={t("当前已上架设备")} />
+            <DetailMetric label={t("已占用")} value={`${occupiedU}U`} />
+            <DetailMetric label={t("可用容量")} value={`${availableU}U`} />
+            <DetailMetric label={t("占用率")} value={`${occupancy}%`} />
           </div>
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
             <Card>
-              <CardHeader><CardTitle>基本信息</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("基本信息")}</CardTitle></CardHeader>
               <CardContent>
                 <DetailList items={[
-                  { label: "机柜编码", value: <span className="font-mono">{rack.code}</span> },
-                  { label: "所属位置", value: <Link className="underline underline-offset-4" to={`/locations/areas/${rack.areaId}`}>{rack.roomName} / {rack.areaName}</Link> },
-                  { label: "规格", value: rack.specification === "custom" ? `${rack.totalU}U 自定义` : rack.specification },
-                  { label: "总 U 数", value: `${rack.totalU}U` },
-                  { label: "额定功率", value: rack.powerCapacityW === null ? "—" : `${rack.powerCapacityW} W` },
-                  { label: "状态", value: <Badge variant="outline">活动</Badge> },
-                  { label: "备注", value: rack.notes ?? "—" },
+                  { label: t("机柜编码"), value: <span className="font-mono">{rack.code}</span> },
+                  { label: t("所属位置"), value: <Link className="underline underline-offset-4" to={`/locations/areas/${rack.areaId}`}>{rack.roomName} / {rack.areaName}</Link> },
+                  { label: t("规格"), value: rack.specification === "custom" ? t("{totalU}U 自定义", { totalU: rack.totalU }) : rack.specification },
+                  { label: t("总 U 数"), value: `${rack.totalU}U` },
+                  { label: t("额定功率"), value: rack.powerCapacityW === null ? "—" : `${rack.powerCapacityW} W` },
+                  { label: t("状态"), value: <Badge variant="outline">{t("活动")}</Badge> },
+                  { label: t("备注"), value: rack.notes ?? "—" },
                 ]} />
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Boxes className="size-4" /> 已上架设备</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Boxes className="size-4" /> {t("已上架设备")}</CardTitle>
                 <CardAction className="flex gap-2">
                   <Button size="sm" variant="outline" nativeButton={false} render={<Link to={addExistingAssetPath} />}>
-                    <Server /> 选择已有
+                    <Server /> {t("选择已有")}
                   </Button>
                   <Button size="sm" nativeButton={false} render={<Link to={addNewAssetPath} />}>
-                    <Plus /> 新建设备
+                    <Plus /> {t("新建设备")}
                   </Button>
                 </CardAction>
               </CardHeader>
               <CardContent className="p-0">
                 {placements.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-muted-foreground">该机柜当前没有设备。</p>
+                  <p className="px-4 py-6 text-sm text-muted-foreground">{t("该机柜当前没有设备。")}</p>
                 ) : (
                   <Table>
-                    <TableHeader><TableRow><TableHead>设备</TableHead><TableHead>类型</TableHead><TableHead>状态</TableHead><TableHead>U 位</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>{t("设备")}</TableHead><TableHead>{t("类型")}</TableHead><TableHead>{t("状态")}</TableHead><TableHead>{t("U 位")}</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {placements.map((placement) => (
                         <TableRow key={placement.placementId}>
                           <TableCell><Link className="font-medium underline-offset-4 hover:underline" to={`/assets/${placement.assetId}`}>{placement.name}</Link></TableCell>
-                          <TableCell>{assetTypeLabels[placement.type] ?? placement.type}</TableCell>
-                          <TableCell>{assetStatusLabels[placement.status] ?? placement.status}</TableCell>
+                          <TableCell>{assetTypeLabel(placement.type)}</TableCell>
+                          <TableCell>{assetStatusLabel(placement.status)}</TableCell>
                           <TableCell className="font-mono">U{placement.startU}–U{placement.endU}</TableCell>
                         </TableRow>
                       ))}
@@ -129,7 +130,7 @@ export function RackDetailPage() {
 }
 
 function BackToRacks({ to = "/racks" }: { to?: string }) {
-  return <Button variant="outline" nativeButton={false} render={<Link to={to} />}><ArrowLeft /> 返回</Button>
+  return <Button variant="outline" nativeButton={false} render={<Link to={to} />}><ArrowLeft /> {t("返回")}</Button>
 }
 
 function RackDetailState({ title, message, error = false }: { title: string; message: string; error?: boolean }) {

@@ -14,7 +14,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { assetStatusLabels, assetTypeLabels } from "@/shared/lib/asset-labels"
+import { t } from "@/shared/i18n/i18n"
+import { assetStatusLabel, assetTypeLabel } from "@/shared/lib/asset-labels"
 import { errorMessage } from "@/shared/lib/errors"
 import { routeWithParams } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
@@ -47,26 +48,26 @@ export function DeviceInspector({
   const movePath = routeWithParams(`/assets/${placement.assetId}/place`, { returnTo })
   const detailPath = routeWithParams(`/assets/${placement.assetId}`, { returnTo })
   const rows = [
-    ["类型", assetTypeLabels[placement.type] ?? placement.type],
-    ["状态", assetStatusLabels[placement.status] ?? placement.status],
-    ["位置", `${rack.roomName} / ${rack.areaName}`],
-    ["机柜", rack.code],
-    ["U 位", `U${placement.startU}–U${placement.endU}`],
-    ["高度", `${placement.heightU}U`],
-    ["主机名", placement.hostname ?? "—"],
-    ["内网 IP", placement.intranetIp ?? "—"],
-    ["序列号", placement.serialNumber ?? "—"],
-    ["厂商 / 型号", [placement.vendor, placement.model].filter(Boolean).join(" ") || "—"],
+    [t("类型"), assetTypeLabel(placement.type)],
+    [t("状态"), assetStatusLabel(placement.status)],
+    [t("位置"), `${rack.roomName} / ${rack.areaName}`],
+    [t("机柜"), rack.code],
+    [t("U 位"), `U${placement.startU}–U${placement.endU}`],
+    [t("高度"), `${placement.heightU}U`],
+    [t("主机名"), placement.hostname ?? "—"],
+    [t("内网 IP"), placement.intranetIp ?? "—"],
+    [t("序列号"), placement.serialNumber ?? "—"],
+    [t("厂商 / 型号"), [placement.vendor, placement.model].filter(Boolean).join(" ") || "—"],
   ]
   return (
-    <aside className="w-72 shrink-0 overflow-auto border-l bg-background p-5" aria-label="设备详情">
+    <aside className="w-72 shrink-0 overflow-auto border-l bg-background p-5" aria-label={t("设备详情")}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Badge variant="outline">设备详情</Badge>
+          <Badge variant="outline">{t("设备详情")}</Badge>
           <h2 className="mt-3 font-semibold">{placement.name}</h2>
           {placement.purpose ? <p className="mt-1 text-xs text-muted-foreground">{placement.purpose}</p> : null}
         </div>
-        <Button variant="ghost" size="icon-sm" aria-label="关闭设备详情" onClick={onClose}><X /></Button>
+        <Button variant="ghost" size="icon-sm" aria-label={t("关闭设备详情")} onClick={onClose}><X /></Button>
       </div>
       <dl className="mt-6 divide-y border-y text-sm">
         {rows.map(([label, value]) => (
@@ -78,31 +79,31 @@ export function DeviceInspector({
       </dl>
       <div className="mt-5 grid grid-cols-2 gap-2">
         <Button variant="outline" nativeButton={false} render={<Link to={editPath} />}>
-          <Pencil /> 编辑
+          <Pencil /> {t("编辑")}
         </Button>
         <Button variant="outline" nativeButton={false} render={<Link to={movePath} />}>
-          <Move /> 移动
+          <Move /> {t("移动")}
         </Button>
         <Sheet>
-          <SheetTrigger render={<Button variant="outline" />}><Unplug /> 下架</SheetTrigger>
+          <SheetTrigger render={<Button variant="outline" />}><Unplug /> {t("下架")}</SheetTrigger>
           <SheetContent className="sm:max-w-md">
             <SheetHeader>
-              <SheetTitle>确认下架 {placement.name}</SheetTitle>
+              <SheetTitle>{t("确认下架 {name}", { name: placement.name })}</SheetTitle>
               <SheetDescription>
-                当前占用的 {rack.code} · U{placement.startU}–U{placement.endU} 将被释放，设备仍保留在资产台账中。
+                {t("当前占用的 {placement} 将被释放，设备仍保留在资产台账中。", { placement: `${rack.code} · U${placement.startU}–U${placement.endU}` })}
               </SheetDescription>
             </SheetHeader>
             {unplace.isError ? <p className="px-4 text-sm text-destructive">{errorMessage(unplace.error)}</p> : null}
             <SheetFooter>
               <Button variant="destructive" disabled={unplace.isPending} onClick={() => unplace.mutate()}>
-                {unplace.isPending ? "正在下架…" : "确认下架"}
+                {unplace.isPending ? t("正在下架…") : t("确认下架")}
               </Button>
-              <SheetClose render={<Button variant="outline" />}>取消</SheetClose>
+              <SheetClose render={<Button variant="outline" />}>{t("取消")}</SheetClose>
             </SheetFooter>
           </SheetContent>
         </Sheet>
         <Button variant="outline" nativeButton={false} render={<Link to={detailPath} />}>
-          完整详情 <ExternalLink />
+          {t("完整详情")} <ExternalLink />
         </Button>
       </div>
     </aside>

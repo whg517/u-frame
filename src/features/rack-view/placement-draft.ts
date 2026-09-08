@@ -2,6 +2,7 @@ import type {
   AssetPlacementMoveInput,
   RackCanvasDto,
 } from "@/shared/lib/tauri-client/bindings"
+import { t } from "@/shared/i18n/i18n"
 
 export type PlacementTarget = {
   endU: number
@@ -64,7 +65,7 @@ export function validatePlacementTarget(
   const rack = racks.find((item) => item.rack.id === rackId)
   const endU = startU + heightU - 1
   if (!rack || startU < 1 || endU > rack.rack.totalU) {
-    return { endU, valid: false, message: "目标位置超出机柜范围" }
+    return { endU, valid: false, message: t("目标位置超出机柜范围") }
   }
   const conflict = rack.placements.find((placement) => (
     placement.assetId !== assetId
@@ -75,7 +76,7 @@ export function validatePlacementTarget(
     return {
       endU,
       valid: false,
-      message: `与 ${conflict.name}（U${conflict.startU}–U${conflict.endU}）冲突`,
+      message: t("与 {name}（U{startU}–U{endU}）冲突", { name: conflict.name, startU: conflict.startU, endU: conflict.endU }),
     }
   }
   return { endU, valid: true, message: null }
