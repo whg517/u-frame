@@ -13,6 +13,7 @@ import { RackCanvasPage } from "@/features/rack-view/rack-canvas-page"
 import { RackDetailPage } from "@/features/racks/rack-detail-page"
 import { RackFormPage } from "@/features/racks/rack-form-page"
 import { RacksPage } from "@/features/racks/racks-page"
+import { SettingsPage } from "@/features/settings/settings-page"
 
 const router = createBrowserRouter([
   {
@@ -35,6 +36,7 @@ const router = createBrowserRouter([
       { path: "assets/:assetId/edit", element: <AssetFormPage /> },
       { path: "assets/:assetId", element: <AssetDetailPage /> },
       { path: "assets/:assetId/place", element: <PlacementFormPage /> },
+      { path: "settings", element: <SettingsPage /> },
     ],
   },
 ])

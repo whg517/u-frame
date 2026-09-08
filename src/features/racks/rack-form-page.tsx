@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Plus } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { EmptyState } from "@/shared/components/empty-state"
 import { FormField } from "@/shared/components/form-field"
 import { PageBody, PageHeader } from "@/shared/components/page"
+import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
@@ -22,17 +23,18 @@ import { queryKeys } from "@/shared/lib/query-keys"
 import { useRacks } from "./queries"
 
 const rackSizes = [18, 22, 27, 32, 37, 42, 45, 47]
-const schema = z.object({
-  areaId: z.string().min(1, "请选择所属区域"),
-  code: z.string().trim().min(1, "请输入机柜编码"),
+const createSchema = () => z.object({
+  areaId: z.string().min(1, t("请选择所属区域")),
+  code: z.string().trim().min(1, t("请输入机柜编码")),
   specification: z.string(),
-  totalU: z.number().int().min(1, "最少为 1U").max(100, "最多为 100U"),
-  powerCapacityW: z.number().min(0, "额定功率不能为负数").optional(),
+  totalU: z.number().int().min(1, t("最少为 1U")).max(100, t("最多为 100U")),
+  powerCapacityW: z.number().min(0, t("额定功率不能为负数")).optional(),
   notes: z.string(),
 })
-type FormData = z.infer<typeof schema>
+type FormData = z.infer<ReturnType<typeof createSchema>>
 
 export function RackFormPage() {
+  const schema = useMemo(() => createSchema(), [])
   const { rackId } = useParams()
   const [searchParams] = useSearchParams()
   const location = useLocation()
@@ -99,55 +101,55 @@ export function RackFormPage() {
   ) ?? []
 
   if (isEditing && (locations.isPending || racks.isPending)) {
-    return <RackFormState title="编辑机柜" message="正在读取机柜…" />
+    return <RackFormState title={t("编辑机柜")} message={t("正在读取机柜…")} />
   }
   if (isEditing && (locations.isError || racks.isError || !rack)) {
-    return <RackFormState title="编辑机柜" message={locations.isError ? errorMessage(locations.error) : racks.isError ? errorMessage(racks.error) : "没有找到这个机柜。"} error />
+    return <RackFormState title={t("编辑机柜")} message={locations.isError ? errorMessage(locations.error) : racks.isError ? errorMessage(racks.error) : t("没有找到这个机柜。")} error />
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title={isEditing ? "编辑机柜" : "新建机柜"}
-        description={isEditing ? "修改位置、编码、规格、功率和备注。" : "选择标准规格或输入自定义 U 数。"}
+        title={isEditing ? t("编辑机柜") : t("新建机柜")}
+        description={isEditing ? t("修改位置、编码、规格、功率和备注。") : t("选择标准规格或输入自定义 U 数。")}
       />
       <PageBody>
         {locations.isSuccess && areas.length === 0 ? (
-          <EmptyState title="请先创建区域" description="机柜必须属于一个活动区域。" action={<Button nativeButton={false} render={<Link to={routeWithParams("/locations/areas/new", { returnTo: origin })} />}><Plus /> 新建区域</Button>} />
+          <EmptyState title={t("请先创建区域")} description={t("机柜必须属于一个活动区域。")} action={<Button nativeButton={false} render={<Link to={routeWithParams("/locations/areas/new", { returnTo: origin })} />}><Plus /> {t("新建区域")}</Button>} />
         ) : (
           <Card className="mx-auto max-w-2xl">
             <CardContent>
               <form className="space-y-5" onSubmit={form.handleSubmit((values) => save.mutate(values))}>
-                {save.isError ? <Alert variant="destructive"><AlertTitle>保存失败</AlertTitle><AlertDescription>{errorMessage(save.error)}</AlertDescription></Alert> : null}
-                <FormField label="所属区域" htmlFor="areaId" error={form.formState.errors.areaId?.message}>
+                {save.isError ? <Alert variant="destructive"><AlertTitle>{t("保存失败")}</AlertTitle><AlertDescription>{errorMessage(save.error)}</AlertDescription></Alert> : null}
+                <FormField label={t("所属区域")} htmlFor="areaId" error={form.formState.errors.areaId?.message}>
                   <select id="areaId" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" {...form.register("areaId")}>
-                    <option value="">请选择区域</option>
+                    <option value="">{t("请选择区域")}</option>
                     {areas.map((area) => <option key={area.id} value={area.id}>{area.roomName} / {area.name}</option>)}
                   </select>
                 </FormField>
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <FormField label="机柜编码" htmlFor="code" error={form.formState.errors.code?.message}>
-                    <Input id="code" placeholder="例如 A-01" {...form.register("code")} />
+                  <FormField label={t("机柜编码")} htmlFor="code" error={form.formState.errors.code?.message}>
+                    <Input id="code" placeholder={t("例如 A-01")} {...form.register("code")} />
                   </FormField>
-                  <FormField label="规格" htmlFor="specification">
+                  <FormField label={t("规格")} htmlFor="specification">
                     <select id="specification" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" {...form.register("specification")}>
                       {rackSizes.map((size) => <option key={size} value={`${size}U`}>{size}U</option>)}
-                      <option value="custom">自定义</option>
+                      <option value="custom">{t("自定义")}</option>
                     </select>
                   </FormField>
                 </div>
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <FormField label="总 U 数" htmlFor="totalU" error={form.formState.errors.totalU?.message}>
+                  <FormField label={t("总 U 数")} htmlFor="totalU" error={form.formState.errors.totalU?.message}>
                     <Input id="totalU" type="number" min={1} max={100} disabled={specification !== "custom"} {...form.register("totalU", { valueAsNumber: true })} />
                   </FormField>
-                  <FormField label="额定功率（W）" htmlFor="powerCapacityW" error={form.formState.errors.powerCapacityW?.message}>
-                    <Input id="powerCapacityW" type="number" min={0} placeholder="可选" {...form.register("powerCapacityW", { setValueAs: (value) => value === "" ? undefined : Number(value) })} />
+                  <FormField label={t("额定功率（W）")} htmlFor="powerCapacityW" error={form.formState.errors.powerCapacityW?.message}>
+                    <Input id="powerCapacityW" type="number" min={0} placeholder={t("可选")} {...form.register("powerCapacityW", { setValueAs: (value) => value === "" ? undefined : Number(value) })} />
                   </FormField>
                 </div>
-                <FormField label="备注" htmlFor="notes"><Textarea id="notes" placeholder="可选" {...form.register("notes")} /></FormField>
+                <FormField label={t("备注")} htmlFor="notes"><Textarea id="notes" placeholder={t("可选")} {...form.register("notes")} /></FormField>
                 <div className="flex justify-end gap-2 border-t pt-5">
-                  <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> 取消</Button>
-                  <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存机柜"}</Button>
+                  <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> {t("取消")}</Button>
+                  <Button type="submit" disabled={save.isPending}>{save.isPending ? t("正在保存…") : isEditing ? t("保存修改") : t("保存机柜")}</Button>
                 </div>
               </form>
             </CardContent>

@@ -1,6 +1,7 @@
 import { CommandError } from "./tauri-client/client"
+import { t, type MessageKey } from "@/shared/i18n/i18n"
 
-const messages: Record<string, string> = {
+const messages: Record<string, MessageKey> = {
   "Validation.Required": "请填写必填项。",
   "Room.CodeConflict": "该机房编码已存在。",
   "Area.CodeConflict": "同一机房内不能使用重复的区域编码。",
@@ -18,10 +19,11 @@ const messages: Record<string, string> = {
 
 export function errorMessage(error: unknown): string {
   if (error instanceof CommandError) {
-    return messages[error.code] ?? `操作失败（${error.operationId}）`
+    const message = messages[error.code]
+    return message ? t(message) : t("操作失败（{operationId}）", { operationId: error.operationId })
   }
   if (error instanceof Error) {
     return error.message
   }
-  return "操作失败，请重试。"
+  return t("操作失败，请重试。")
 }

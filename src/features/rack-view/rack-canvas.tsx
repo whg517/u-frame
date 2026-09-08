@@ -8,6 +8,7 @@ import {
 } from "react"
 
 import type { RackCanvasDto, RackPlacementViewDto } from "@/shared/lib/tauri-client/bindings"
+import { t } from "@/shared/i18n/i18n"
 import {
   U_HEIGHT,
   deviceGrabOffset,
@@ -163,7 +164,7 @@ export function RackCanvas({
   return (
     <div
       className="rack-stage flex min-h-full min-w-max items-center p-6 lg:p-8"
-      aria-label="机柜画布"
+      aria-label={t("机柜画布")}
     >
       <div className="flex items-end gap-12">
         {orderedRackIds.map((rackId) => {
@@ -186,8 +187,8 @@ export function RackCanvas({
                   className="rack-drag-handle"
                   draggable={!isReordering && !isLayoutEditing}
                   disabled={isReordering || isLayoutEditing}
-                  aria-label={`调整机柜 ${rack.code} 的顺序`}
-                  title="拖动调整顺序；也可使用左右方向键"
+                  aria-label={t("调整机柜 {code} 的顺序", { code: rack.code })}
+                  title={t("拖动调整顺序；也可使用左右方向键")}
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = "move"
                     event.dataTransfer.setData("text/plain", rack.id)
@@ -240,7 +241,7 @@ export function RackCanvas({
                       key={placement.placementId}
                       style={{ bottom: geometry.bottom, height: geometry.height } as CSSProperties}
                       title={`${placement.name} · U${placement.startU}–U${placement.endU}`}
-                      aria-label={`${placement.name}，U${placement.startU} 到 U${placement.endU}`}
+                      aria-label={t("{name}，U{startU} 到 U{endU}", { name: placement.name, startU: placement.startU, endU: placement.endU })}
                       onClick={() => onSelectAsset(placement)}
                       onDragStart={(event) => {
                         const bounds = event.currentTarget.getBoundingClientRect()

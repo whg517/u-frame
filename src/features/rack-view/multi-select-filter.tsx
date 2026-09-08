@@ -2,6 +2,7 @@ import { Check, ChevronDown } from "lucide-react"
 import { Popover } from "@base-ui/react/popover"
 
 import { cn } from "@/lib/utils"
+import { t } from "@/shared/i18n/i18n"
 
 export interface MultiSelectOption {
   value: string
@@ -38,7 +39,7 @@ export function MultiSelectFilter({
       ? selectedOptions[0].label
       : selectedOptions.length <= 2
         ? selectedOptions.map((option) => option.label).join("、")
-        : `已选 ${selectedOptions.length} 个${label}`
+        : t("已选 {count} 个{label}", { count: selectedOptions.length, label })
 
   const toggle = (value: string, checked: boolean) => {
     onChange(checked
@@ -49,7 +50,7 @@ export function MultiSelectFilter({
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
       <Popover.Trigger
-        aria-label={`${label}筛选：${summary}`}
+        aria-label={t("{label}筛选：{summary}", { label, summary })}
         className={cn(
           "flex h-8 min-w-36 cursor-pointer items-center justify-between gap-3 rounded-md border border-input bg-background px-2.5 text-sm outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 data-popup-open:bg-muted/50",
           disabled && "pointer-events-none opacity-50",
@@ -65,21 +66,21 @@ export function MultiSelectFilter({
           <Popover.Popup className="w-64 origin-top-right rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-lg outline-none transition data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             <div className="flex items-center justify-between gap-3 px-2 py-1.5">
               <div>
-                <p className="text-sm font-medium">选择{label}</p>
+                <p className="text-sm font-medium">{t("选择{label}", { label })}</p>
                 <p className="text-xs text-muted-foreground">
-                  {values.length === 0 ? `当前显示${allLabel}` : `已选择 ${values.length} 项`}
+                  {values.length === 0 ? t("当前显示{allLabel}", { allLabel }) : t("已选择 {count} 项", { count: values.length })}
                 </p>
               </div>
               {values.length > 0 ? (
                 <button className="text-xs text-muted-foreground hover:text-foreground" type="button" onClick={() => onChange([])}>
-                  清除
+                  {t("清除")}
                 </button>
               ) : null}
             </div>
             <div className="my-1 border-t" />
             <div className="max-h-64 overflow-auto">
               {options.length === 0 ? (
-                <p className="px-2 py-3 text-xs text-muted-foreground">没有可选{label}</p>
+                <p className="px-2 py-3 text-xs text-muted-foreground">{t("没有可选{label}", { label })}</p>
               ) : options.map((option) => (
                 <FilterOption
                   key={option.value}
@@ -92,7 +93,7 @@ export function MultiSelectFilter({
             </div>
             <div className="mt-1 border-t p-1 pt-2">
               <Popover.Close className="h-8 w-full rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-                完成
+                {t("完成")}
               </Popover.Close>
             </div>
           </Popover.Popup>

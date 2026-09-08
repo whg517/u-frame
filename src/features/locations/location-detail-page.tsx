@@ -8,13 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DetailList, DetailMetric } from "@/shared/components/detail-list"
 import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
+import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useLocations } from "./queries"
 
-function BackToLocations({ to = "/locations", label = "返回" }: { to?: string; label?: string }) {
+function BackToLocations({ to = "/locations", label = t("返回") }: { to?: string; label?: string }) {
   return (
     <Button variant="outline" nativeButton={false} render={<Link to={to} />}>
       <ArrowLeft /> {label}
@@ -28,8 +29,8 @@ function LocationNotFound({ title }: { title: string }) {
       <PageHeader title={title} actions={<BackToLocations />} />
       <PageBody>
         <EmptyState
-          title="没有找到这个位置"
-          description="位置可能已归档，或者链接中的标识无效。"
+          title={t("没有找到这个位置")}
+          description={t("位置可能已归档，或者链接中的标识无效。")}
           action={<BackToLocations />}
         />
       </PageBody>
@@ -48,14 +49,14 @@ export function RoomDetailPage() {
   })
 
   if (locations.isPending || racks.isPending) {
-    return <DetailLoading title="机房详情" />
+    return <DetailLoading title={t("机房详情")} />
   }
   if (locations.isError || racks.isError) {
-    return <DetailError title="机房详情" error={locations.error ?? racks.error} />
+    return <DetailError title={t("机房详情")} error={locations.error ?? racks.error} />
   }
 
   const node = locations.data.rooms.find(({ room }) => room.id === roomId)
-  if (!node) return <LocationNotFound title="机房详情" />
+  if (!node) return <LocationNotFound title={t("机房详情")} />
   const roomRacks = racks.data.filter((rack) => rack.roomId === roomId)
   const origin = currentRoute(location.pathname, location.search)
   const returnTo = safeReturnTo(searchParams.get("returnTo"), "/locations")
@@ -64,18 +65,18 @@ export function RoomDetailPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title={node.room.name}
-        description={`机房编码 ${node.room.code}`}
+        description={t("机房编码 {code}", { code: node.room.code })}
         actions={
           <>
             <BackToLocations to={returnTo} />
             <Button variant="outline" nativeButton={false} render={<Link to={routeWithParams("/locations/areas/new", { roomId: node.room.id, returnTo: origin })} />}>
-              <Plus /> 新增区域
+              <Plus /> {t("新增区域")}
             </Button>
             <Button variant="outline" nativeButton={false} render={<Link to={`/?room=${encodeURIComponent(node.room.id)}`} />}>
-              <LocateFixed /> 查看机柜
+              <LocateFixed /> {t("查看机柜")}
             </Button>
             <Button nativeButton={false} render={<Link to={`/locations/rooms/${node.room.id}/edit`} />}>
-              <Pencil /> 编辑机房
+              <Pencil /> {t("编辑机房")}
             </Button>
           </>
         }
@@ -83,25 +84,25 @@ export function RoomDetailPage() {
       <PageBody>
         <div className="mx-auto grid max-w-5xl gap-6">
           <div className="grid gap-3 sm:grid-cols-2">
-            <DetailMetric label="区域数量" value={node.areas.length} description="当前活动区域" />
-            <DetailMetric label="机柜数量" value={roomRacks.length} description="所有区域中的活动机柜" />
+            <DetailMetric label={t("区域数量")} value={node.areas.length} description={t("当前活动区域")} />
+            <DetailMetric label={t("机柜数量")} value={roomRacks.length} description={t("所有区域中的活动机柜")} />
           </div>
           <Card>
-            <CardHeader><CardTitle>基本信息</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("基本信息")}</CardTitle></CardHeader>
             <CardContent>
               <DetailList items={[
-                { label: "机房名称", value: node.room.name },
-                { label: "机房编码", value: <span className="font-mono">{node.room.code}</span> },
-                { label: "状态", value: <Badge variant="outline">活动</Badge> },
-                { label: "描述", value: node.room.description ?? "—" },
+                { label: t("机房名称"), value: node.room.name },
+                { label: t("机房编码"), value: <span className="font-mono">{node.room.code}</span> },
+                { label: t("状态"), value: <Badge variant="outline">{t("活动")}</Badge> },
+                { label: t("描述"), value: node.room.description ?? "—" },
               ]} />
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>区域</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("区域")}</CardTitle></CardHeader>
             <CardContent className="p-0">
               {node.areas.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground">该机房还没有区域。</p>
+                <p className="px-4 py-6 text-sm text-muted-foreground">{t("该机房还没有区域。")}</p>
               ) : (
                 <ul className="divide-y">
                   {node.areas.map((area) => (
@@ -143,14 +144,14 @@ export function AreaDetailPage() {
     queryFn: () => tauriClient.listRacks(areaId),
   })
 
-  if (locations.isPending || racks.isPending) return <DetailLoading title="区域详情" />
+  if (locations.isPending || racks.isPending) return <DetailLoading title={t("区域详情")} />
   if (locations.isError || racks.isError) {
-    return <DetailError title="区域详情" error={locations.error ?? racks.error} />
+    return <DetailError title={t("区域详情")} error={locations.error ?? racks.error} />
   }
 
   const roomNode = locations.data.rooms.find(({ areas }) => areas.some((area) => area.id === areaId))
   const area = roomNode?.areas.find((item) => item.id === areaId)
-  if (!roomNode || !area) return <LocationNotFound title="区域详情" />
+  if (!roomNode || !area) return <LocationNotFound title={t("区域详情")} />
   const totalU = racks.data.reduce((sum, rack) => sum + rack.totalU, 0)
   const origin = currentRoute(location.pathname, location.search)
   const returnTo = safeReturnTo(searchParams.get("returnTo"), "/locations")
@@ -164,13 +165,13 @@ export function AreaDetailPage() {
           <>
             <BackToLocations to={returnTo} />
             <Button variant="outline" nativeButton={false} render={<Link to={routeWithParams("/racks/new", { areaId: area.id, returnTo: origin })} />}>
-              <Plus /> 新增机柜
+              <Plus /> {t("新增机柜")}
             </Button>
             <Button variant="outline" nativeButton={false} render={<Link to={`/?area=${encodeURIComponent(area.id)}`} />}>
-              <LocateFixed /> 查看画布
+              <LocateFixed /> {t("查看画布")}
             </Button>
             <Button nativeButton={false} render={<Link to={`/locations/areas/${area.id}/edit`} />}>
-              <Pencil /> 编辑区域
+              <Pencil /> {t("编辑区域")}
             </Button>
           </>
         }
@@ -178,26 +179,26 @@ export function AreaDetailPage() {
       <PageBody>
         <div className="mx-auto grid max-w-5xl gap-6">
           <div className="grid gap-3 sm:grid-cols-2">
-            <DetailMetric label="机柜数量" value={racks.data.length} description="当前活动机柜" />
-            <DetailMetric label="总容量" value={`${totalU}U`} description="按机柜总 U 数汇总" />
+            <DetailMetric label={t("机柜数量")} value={racks.data.length} description={t("当前活动机柜")} />
+            <DetailMetric label={t("总容量")} value={`${totalU}U`} description={t("按机柜总 U 数汇总")} />
           </div>
           <Card>
-            <CardHeader><CardTitle>基本信息</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("基本信息")}</CardTitle></CardHeader>
             <CardContent>
               <DetailList items={[
-                { label: "区域名称", value: area.name },
-                { label: "区域编码", value: <span className="font-mono">{area.code}</span> },
-                { label: "所属机房", value: <Link className="underline underline-offset-4" to={`/locations/rooms/${roomNode.room.id}`}>{roomNode.room.name}</Link> },
-                { label: "状态", value: <Badge variant="outline">活动</Badge> },
-                { label: "描述", value: area.description ?? "—" },
+                { label: t("区域名称"), value: area.name },
+                { label: t("区域编码"), value: <span className="font-mono">{area.code}</span> },
+                { label: t("所属机房"), value: <Link className="underline underline-offset-4" to={`/locations/rooms/${roomNode.room.id}`}>{roomNode.room.name}</Link> },
+                { label: t("状态"), value: <Badge variant="outline">{t("活动")}</Badge> },
+                { label: t("描述"), value: area.description ?? "—" },
               ]} />
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>机柜</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("机柜")}</CardTitle></CardHeader>
             <CardContent className="p-0">
               {racks.data.length === 0 ? (
-                <p className="px-4 py-6 text-sm text-muted-foreground">该区域还没有机柜。</p>
+                <p className="px-4 py-6 text-sm text-muted-foreground">{t("该区域还没有机柜。")}</p>
               ) : (
                 <ul className="divide-y">
                   {racks.data.map((rack) => (
@@ -207,7 +208,7 @@ export function AreaDetailPage() {
                           <span className="block font-mono font-medium">{rack.code}</span>
                           <span className="text-xs text-muted-foreground">
                             {rack.specification === "custom"
-                              ? `${rack.totalU}U 自定义`
+                              ? t("{totalU}U 自定义", { totalU: rack.totalU })
                               : rack.specification}
                           </span>
                         </span>
@@ -226,7 +227,7 @@ export function AreaDetailPage() {
 }
 
 function DetailLoading({ title }: { title: string }) {
-  return <div className="flex min-h-0 flex-1 flex-col"><PageHeader title={title} /><PageBody><p className="text-sm text-muted-foreground">正在读取详情…</p></PageBody></div>
+  return <div className="flex min-h-0 flex-1 flex-col"><PageHeader title={title} /><PageBody><p className="text-sm text-muted-foreground">{t("正在读取详情…")}</p></PageBody></div>
 }
 
 function DetailError({ title, error }: { title: string; error: unknown }) {

@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
@@ -13,36 +13,40 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { FormField } from "@/shared/components/form-field"
 import { PageBody, PageHeader } from "@/shared/components/page"
+import { t } from "@/shared/i18n/i18n"
+import { assetStatusLabel, assetTypeLabel } from "@/shared/lib/asset-labels"
 import { errorMessage } from "@/shared/lib/errors"
 import { routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useAssets } from "./queries"
 
-const optionalIp = z.string().refine((value) => {
-  if (!value.trim()) return true
-  return /^((\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]+)$/.test(value.trim())
-}, "请输入有效的 IP 地址")
-
-const schema = z.object({
-  type: z.enum(["server", "switch", "router", "firewall"]),
-  name: z.string().trim().min(1, "请输入设备名称"),
-  hostname: z.string(),
-  intranetIp: optionalIp,
-  managementIp: optionalIp,
-  serialNumber: z.string(),
-  vendor: z.string(),
-  model: z.string(),
-  purpose: z.string(),
-  heightU: z.number().int().min(1, "最少为 1U").max(100, "最多为 100U"),
-  status: z.enum(["active", "maintenance", "offline"]),
-  notes: z.string(),
-})
-type FormData = z.infer<typeof schema>
+const createSchema = () => {
+  const optionalIp = z.string().refine((value) => {
+    if (!value.trim()) return true
+    return /^((\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]+)$/.test(value.trim())
+  }, t("请输入有效的 IP 地址"))
+  return z.object({
+    type: z.enum(["server", "switch", "router", "firewall"]),
+    name: z.string().trim().min(1, t("请输入设备名称")),
+    hostname: z.string(),
+    intranetIp: optionalIp,
+    managementIp: optionalIp,
+    serialNumber: z.string(),
+    vendor: z.string(),
+    model: z.string(),
+    purpose: z.string(),
+    heightU: z.number().int().min(1, t("最少为 1U")).max(100, t("最多为 100U")),
+    status: z.enum(["active", "maintenance", "offline"]),
+    notes: z.string(),
+  })
+}
+type FormData = z.infer<ReturnType<typeof createSchema>>
 
 const nullable = (value: string) => value.trim() || null
 
 export function AssetFormPage() {
+  const schema = useMemo(() => createSchema(), [])
   const { assetId } = useParams()
   const [searchParams] = useSearchParams()
   const isEditing = Boolean(assetId)
@@ -102,52 +106,52 @@ export function AssetFormPage() {
   })
 
   if (isEditing && assets.isPending) {
-    return <AssetFormState title="编辑设备" message="正在读取设备…" />
+    return <AssetFormState title={t("编辑设备")} message={t("正在读取设备…")} />
   }
   if (isEditing && (assets.isError || !asset)) {
-    return <AssetFormState title="编辑设备" message={assets.isError ? errorMessage(assets.error) : "没有找到这个设备。"} error />
+    return <AssetFormState title={t("编辑设备")} message={assets.isError ? errorMessage(assets.error) : t("没有找到这个设备。")} error />
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title={isEditing ? "编辑设备" : "新建设备"}
-        description={isEditing ? "修改设备台账字段；已上架设备调整高度时会重新校验 U 位。" : "设备可以暂不上架，物理位置由上架记录统一维护。"}
+        title={isEditing ? t("编辑设备") : t("新建设备")}
+        description={isEditing ? t("修改设备台账字段；已上架设备调整高度时会重新校验 U 位。") : t("设备可以暂不上架，物理位置由上架记录统一维护。")}
       />
       <PageBody>
         <Card className="mx-auto max-w-3xl">
           <CardContent>
             <form className="space-y-5" onSubmit={form.handleSubmit((value) => save.mutate(value))}>
-              {save.isError ? <Alert variant="destructive"><AlertTitle>保存失败</AlertTitle><AlertDescription>{errorMessage(save.error)}</AlertDescription></Alert> : null}
+              {save.isError ? <Alert variant="destructive"><AlertTitle>{t("保存失败")}</AlertTitle><AlertDescription>{errorMessage(save.error)}</AlertDescription></Alert> : null}
               <div className="grid gap-5 sm:grid-cols-2">
-                <FormField label="设备类型" htmlFor="type">
+                <FormField label={t("设备类型")} htmlFor="type">
                   <select id="type" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" {...form.register("type")}>
-                    <option value="server">服务器</option><option value="switch">交换机</option><option value="router">路由器</option><option value="firewall">防火墙</option>
+                    <option value="server">{assetTypeLabel("server")}</option><option value="switch">{assetTypeLabel("switch")}</option><option value="router">{assetTypeLabel("router")}</option><option value="firewall">{assetTypeLabel("firewall")}</option>
                   </select>
                 </FormField>
-                <FormField label="设备状态" htmlFor="status">
+                <FormField label={t("设备状态")} htmlFor="status">
                   <select id="status" className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm" {...form.register("status")}>
-                    <option value="active">运行中</option><option value="maintenance">维护中</option><option value="offline">离线</option>
+                    <option value="active">{assetStatusLabel("active")}</option><option value="maintenance">{assetStatusLabel("maintenance")}</option><option value="offline">{assetStatusLabel("offline")}</option>
                   </select>
                 </FormField>
               </div>
               <div className="grid gap-5 sm:grid-cols-[1fr_160px]">
-                <FormField label="设备名称" htmlFor="name" error={form.formState.errors.name?.message}><Input id="name" autoFocus placeholder="例如 计算节点 01" {...form.register("name")} /></FormField>
-                <FormField label="高度" htmlFor="heightU" error={form.formState.errors.heightU?.message}><Input id="heightU" type="number" min={1} max={100} {...form.register("heightU", { valueAsNumber: true })} /></FormField>
+                <FormField label={t("设备名称")} htmlFor="name" error={form.formState.errors.name?.message}><Input id="name" autoFocus placeholder={t("例如 计算节点 01")} {...form.register("name")} /></FormField>
+                <FormField label={t("高度")} htmlFor="heightU" error={form.formState.errors.heightU?.message}><Input id="heightU" type="number" min={1} max={100} {...form.register("heightU", { valueAsNumber: true })} /></FormField>
               </div>
               <div className="grid gap-5 sm:grid-cols-2">
-                <FormField label="主机名" htmlFor="hostname"><Input id="hostname" {...form.register("hostname")} /></FormField>
-                <FormField label="序列号" htmlFor="serialNumber"><Input id="serialNumber" {...form.register("serialNumber")} /></FormField>
-                <FormField label="内网 IP" htmlFor="intranetIp" error={form.formState.errors.intranetIp?.message}><Input id="intranetIp" placeholder="10.0.0.10" {...form.register("intranetIp")} /></FormField>
-                <FormField label="管理 IP" htmlFor="managementIp" error={form.formState.errors.managementIp?.message}><Input id="managementIp" placeholder="可选" {...form.register("managementIp")} /></FormField>
-                <FormField label="厂商" htmlFor="vendor"><Input id="vendor" {...form.register("vendor")} /></FormField>
-                <FormField label="型号" htmlFor="model"><Input id="model" {...form.register("model")} /></FormField>
+                <FormField label={t("主机名")} htmlFor="hostname"><Input id="hostname" {...form.register("hostname")} /></FormField>
+                <FormField label={t("序列号")} htmlFor="serialNumber"><Input id="serialNumber" {...form.register("serialNumber")} /></FormField>
+                <FormField label={t("内网 IP")} htmlFor="intranetIp" error={form.formState.errors.intranetIp?.message}><Input id="intranetIp" placeholder="10.0.0.10" {...form.register("intranetIp")} /></FormField>
+                <FormField label={t("管理 IP")} htmlFor="managementIp" error={form.formState.errors.managementIp?.message}><Input id="managementIp" placeholder={t("可选")} {...form.register("managementIp")} /></FormField>
+                <FormField label={t("厂商")} htmlFor="vendor"><Input id="vendor" {...form.register("vendor")} /></FormField>
+                <FormField label={t("型号")} htmlFor="model"><Input id="model" {...form.register("model")} /></FormField>
               </div>
-              <FormField label="用途" htmlFor="purpose"><Input id="purpose" {...form.register("purpose")} /></FormField>
-              <FormField label="备注" htmlFor="notes"><Textarea id="notes" {...form.register("notes")} /></FormField>
+              <FormField label={t("用途")} htmlFor="purpose"><Input id="purpose" {...form.register("purpose")} /></FormField>
+              <FormField label={t("备注")} htmlFor="notes"><Textarea id="notes" {...form.register("notes")} /></FormField>
               <div className="flex justify-end gap-2 border-t pt-5">
-                <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> 取消</Button>
-                <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存设备"}</Button>
+                <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> {t("取消")}</Button>
+                <Button type="submit" disabled={save.isPending}>{save.isPending ? t("正在保存…") : isEditing ? t("保存修改") : t("保存设备")}</Button>
               </div>
             </form>
           </CardContent>

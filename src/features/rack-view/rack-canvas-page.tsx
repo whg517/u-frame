@@ -6,6 +6,7 @@ import { Link, useLocation, useSearchParams } from "react-router"
 import { Button } from "@/components/ui/button"
 import { workspaceHeaderHeightClass } from "@/shared/components/page"
 import { EmptyState } from "@/shared/components/empty-state"
+import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
 import { queryKeys } from "@/shared/lib/query-keys"
 import type { AssetPlacementMoveInput } from "@/shared/lib/tauri-client/bindings"
@@ -142,17 +143,17 @@ export function RackCanvasPage() {
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <header className={`${workspaceHeaderHeightClass} flex shrink-0 items-center justify-between gap-6 border-b px-5 lg:px-6`}>
         <div className="flex min-w-0 items-baseline gap-3">
-          <h1 className="shrink-0 text-lg font-semibold tracking-tight">机柜一览</h1>
+          <h1 className="shrink-0 text-lg font-semibold tracking-tight">{t("机柜一览")}</h1>
           <p className="hidden truncate text-xs text-muted-foreground lg:block">
             {isLayoutEditing
-              ? `布局编辑中 · ${draftMoves.length > 0 ? `已调整 ${draftMoves.length} 台设备` : "拖动设备调整位置"}`
-              : "正面 U 位 · 顶部为最大 U，底部为 U1"}
+              ? t("布局编辑中 · {status}", { status: draftMoves.length > 0 ? t("已调整 {count} 台设备", { count: draftMoves.length }) : t("拖动设备调整位置") })
+              : t("正面 U 位 · 顶部为最大 U，底部为 U1")}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <MultiSelectFilter
-            label="机房"
-            allLabel="全部机房"
+            label={t("机房")}
+            allLabel={t("全部机房")}
             options={rooms.map((room) => ({ value: room.id, label: room.name, description: room.code }))}
             values={roomIds}
             onChange={updateRooms}
@@ -161,8 +162,8 @@ export function RackCanvasPage() {
             onOpenChange={(open) => setOpenFilter(open ? "room" : null)}
           />
           <MultiSelectFilter
-            label="区域"
-            allLabel="全部区域"
+            label={t("区域")}
+            allLabel={t("全部区域")}
             options={visibleAreas.map((area) => ({ value: area.id, label: area.name, description: `${area.roomName} · ${area.code}` }))}
             values={areaIds}
             onChange={updateAreas}
@@ -173,16 +174,16 @@ export function RackCanvasPage() {
           {isLayoutEditing ? (
             <>
               <Button variant="outline" size="sm" disabled={saveLayout.isPending} onClick={cancelLayoutEdit}>
-                <X /> 取消
+                <X /> {t("取消")}
               </Button>
               <Button size="sm" disabled={draftMoves.length === 0 || saveLayout.isPending} onClick={() => saveLayout.mutate()}>
-                <Save /> {saveLayout.isPending ? "正在保存…" : "保存调整"}
+                <Save /> {saveLayout.isPending ? t("正在保存…") : t("保存调整")}
               </Button>
             </>
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={beginLayoutEdit}>
-                <PencilRuler /> 编辑布局
+                <PencilRuler /> {t("编辑布局")}
               </Button>
               <Button
                 variant="outline"
@@ -190,7 +191,7 @@ export function RackCanvasPage() {
                 nativeButton={false}
                 render={<Link to={createRackPath} />}
               >
-                <Plus /> 新建机柜
+                <Plus /> {t("新建机柜")}
               </Button>
             </>
           )}
@@ -205,7 +206,7 @@ export function RackCanvasPage() {
           >
             {view.isPending ? (
               <div className="grid size-full place-items-center">
-                <p className="text-sm text-muted-foreground">正在绘制机柜…</p>
+                <p className="text-sm text-muted-foreground">{t("正在绘制机柜…")}</p>
               </div>
             ) : view.isError ? (
               <div className="grid size-full place-items-center px-6 text-center">
@@ -215,12 +216,12 @@ export function RackCanvasPage() {
               <div className="grid size-full min-h-80 place-items-center">
                 <EmptyState
                   variant="canvas"
-                  title={roomIds.length > 0 || areaIds.length > 0 ? "筛选范围没有机柜" : "当前范围没有机柜"}
-                  description={roomIds.length > 0 || areaIds.length > 0 ? "可以调整机房或区域筛选条件。" : "创建位置和机柜后，会在这里显示正面 U 位图。"}
+                  title={roomIds.length > 0 || areaIds.length > 0 ? t("筛选范围没有机柜") : t("当前范围没有机柜")}
+                  description={roomIds.length > 0 || areaIds.length > 0 ? t("可以调整机房或区域筛选条件。") : t("创建位置和机柜后，会在这里显示正面 U 位图。")}
                   action={
                     roomIds.length > 0 || areaIds.length > 0
-                      ? <Button variant="outline" onClick={clearFilters}>查看全部</Button>
-                      : <Button nativeButton={false} render={<Link to={createRackPath} />}><Plus /> 创建机柜</Button>
+                      ? <Button variant="outline" onClick={clearFilters}>{t("查看全部")}</Button>
+                      : <Button nativeButton={false} render={<Link to={createRackPath} />}><Plus /> {t("创建机柜")}</Button>
                   }
                 />
               </div>

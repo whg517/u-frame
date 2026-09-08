@@ -14,21 +14,23 @@ import { Textarea } from "@/components/ui/textarea"
 import { EmptyState } from "@/shared/components/empty-state"
 import { FormField } from "@/shared/components/form-field"
 import { PageBody, PageHeader } from "@/shared/components/page"
+import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { useLocations } from "./queries"
 
-const schema = z.object({
-  roomId: z.string().min(1, "请选择所属机房"),
-  code: z.string().trim().min(1, "请输入区域编码"),
-  name: z.string().trim().min(1, "请输入区域名称"),
+const createSchema = () => z.object({
+  roomId: z.string().min(1, t("请选择所属机房")),
+  code: z.string().trim().min(1, t("请输入区域编码")),
+  name: z.string().trim().min(1, t("请输入区域名称")),
   description: z.string(),
 })
-type FormData = z.infer<typeof schema>
+type FormData = z.infer<ReturnType<typeof createSchema>>
 
 export function AreaFormPage() {
+  const schema = useMemo(() => createSchema(), [])
   const { areaId } = useParams()
   const [searchParams] = useSearchParams()
   const location = useLocation()
@@ -87,24 +89,24 @@ export function AreaFormPage() {
   })
 
   if (isEditing && locations.isPending) {
-    return <AreaFormState title="编辑区域" message="正在读取区域…" />
+    return <AreaFormState title={t("编辑区域")} message={t("正在读取区域…")} />
   }
   if (isEditing && (locations.isError || !existing)) {
-    return <AreaFormState title="编辑区域" message={locations.isError ? errorMessage(locations.error) : "没有找到这个区域。"} error />
+    return <AreaFormState title={t("编辑区域")} message={locations.isError ? errorMessage(locations.error) : t("没有找到这个区域。")} error />
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title={isEditing ? "编辑区域" : "新建区域"}
-        description={isEditing ? "修改所属机房、编码、名称和描述。" : "在已有机房下建立区域。"}
+        title={isEditing ? t("编辑区域") : t("新建区域")}
+        description={isEditing ? t("修改所属机房、编码、名称和描述。") : t("在已有机房下建立区域。")}
       />
       <PageBody>
         {locations.isSuccess && locations.data.rooms.length === 0 ? (
           <EmptyState
-            title="请先创建机房"
-            description="区域必须属于一个活动机房。"
-            action={<Button nativeButton={false} render={<Link to={routeWithParams("/locations/rooms/new", { returnTo: origin })} />}><Plus /> 新建机房</Button>}
+            title={t("请先创建机房")}
+            description={t("区域必须属于一个活动机房。")}
+            action={<Button nativeButton={false} render={<Link to={routeWithParams("/locations/rooms/new", { returnTo: origin })} />}><Plus /> {t("新建机房")}</Button>}
           />
         ) : (
           <Card className="mx-auto max-w-2xl">
@@ -115,36 +117,36 @@ export function AreaFormPage() {
               >
                 {save.isError ? (
                   <Alert variant="destructive">
-                    <AlertTitle>保存失败</AlertTitle>
+                    <AlertTitle>{t("保存失败")}</AlertTitle>
                     <AlertDescription>{errorMessage(save.error)}</AlertDescription>
                   </Alert>
                 ) : null}
-                <FormField label="所属机房" htmlFor="roomId" error={form.formState.errors.roomId?.message}>
+                <FormField label={t("所属机房")} htmlFor="roomId" error={form.formState.errors.roomId?.message}>
                   <select
                     id="roomId"
                     className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
                     {...form.register("roomId")}
                   >
-                    <option value="">请选择机房</option>
+                    <option value="">{t("请选择机房")}</option>
                     {locations.data?.rooms.map(({ room }) => (
                       <option key={room.id} value={room.id}>{room.name} · {room.code}</option>
                     ))}
                   </select>
                 </FormField>
                 <div className="grid gap-5 sm:grid-cols-2">
-                  <FormField label="区域编码" htmlFor="code" error={form.formState.errors.code?.message}>
-                    <Input id="code" placeholder="例如 A" {...form.register("code")} />
+                  <FormField label={t("区域编码")} htmlFor="code" error={form.formState.errors.code?.message}>
+                    <Input id="code" placeholder={t("例如 A")} {...form.register("code")} />
                   </FormField>
-                  <FormField label="区域名称" htmlFor="name" error={form.formState.errors.name?.message}>
-                    <Input id="name" placeholder="例如 A 区" {...form.register("name")} />
+                  <FormField label={t("区域名称")} htmlFor="name" error={form.formState.errors.name?.message}>
+                    <Input id="name" placeholder={t("例如 A 区")} {...form.register("name")} />
                   </FormField>
                 </div>
-                <FormField label="描述" htmlFor="description">
-                  <Textarea id="description" placeholder="可选" {...form.register("description")} />
+                <FormField label={t("描述")} htmlFor="description">
+                  <Textarea id="description" placeholder={t("可选")} {...form.register("description")} />
                 </FormField>
                 <div className="flex justify-end gap-2 border-t pt-5">
-                  <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> 取消</Button>
-                  <Button type="submit" disabled={save.isPending}>{save.isPending ? "正在保存…" : isEditing ? "保存修改" : "保存区域"}</Button>
+                  <Button variant="ghost" nativeButton={false} render={<Link to={returnTo} />}><ArrowLeft /> {t("取消")}</Button>
+                  <Button type="submit" disabled={save.isPending}>{save.isPending ? t("正在保存…") : isEditing ? t("保存修改") : t("保存区域")}</Button>
                 </div>
               </form>
             </CardContent>
