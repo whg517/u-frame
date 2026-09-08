@@ -12,7 +12,7 @@ describe("preferences", () => {
   it("loads valid values and falls back field by field", () => {
     const storage = {
       getItem: (key: string) => key === preferencesStorageKey
-        ? JSON.stringify({ themeMode: "dark", accentColor: "invalid", language: "en-US" })
+        ? JSON.stringify({ themeMode: "dark", accentColor: "invalid", language: "en-US", defaultCanvasZoom: 1.4 })
         : null,
     }
 
@@ -20,6 +20,7 @@ describe("preferences", () => {
       themeMode: "dark",
       accentColor: "neutral",
       language: "en-US",
+      defaultCanvasZoom: 1.4,
     })
   })
 
@@ -27,9 +28,18 @@ describe("preferences", () => {
     expect(readPreferences({ getItem: () => "{" })).toEqual(defaultPreferences)
   })
 
+  it("defaults legacy and unsupported canvas zoom values to 100%", () => {
+    expect(readPreferences({
+      getItem: () => JSON.stringify({ themeMode: "light", accentColor: "green", language: "zh-CN" }),
+    }).defaultCanvasZoom).toBe(1)
+    expect(readPreferences({
+      getItem: () => JSON.stringify({ defaultCanvasZoom: 1.1 }),
+    }).defaultCanvasZoom).toBe(1)
+  })
+
   it("resolves system mode and applies document attributes", () => {
     const root = document.createElement("html")
-    applyPreferences({ themeMode: "system", accentColor: "blue", language: "en-US" }, true, root)
+    applyPreferences({ themeMode: "system", accentColor: "blue", language: "en-US", defaultCanvasZoom: 1.2 }, true, root)
 
     expect(isDarkMode("system", true)).toBe(true)
     expect(root).toHaveClass("dark")

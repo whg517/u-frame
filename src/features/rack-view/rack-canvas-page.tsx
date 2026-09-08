@@ -12,6 +12,7 @@ import { queryKeys } from "@/shared/lib/query-keys"
 import type { AssetPlacementMoveInput } from "@/shared/lib/tauri-client/bindings"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { currentRoute, routeWithParams } from "@/shared/lib/navigation-context"
+import { usePreferences } from "@/shared/preferences/preferences-provider"
 import { useLocations } from "@/features/locations/queries"
 import { DeviceInspector } from "./device-inspector"
 import { CanvasZoomControls } from "./canvas-zoom-controls"
@@ -23,8 +24,9 @@ import { RackCanvas } from "./rack-canvas"
 import "./rack-canvas.css"
 
 export function RackCanvasPage() {
+  const { preferences } = usePreferences()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState<number>(() => preferences.defaultCanvasZoom)
   const [openFilter, setOpenFilter] = useState<"room" | "area" | null>(null)
   const [isLayoutEditing, setIsLayoutEditing] = useState(false)
   const [draftMoves, setDraftMoves] = useState<AssetPlacementMoveInput[]>([])
@@ -264,8 +266,9 @@ export function RackCanvasPage() {
           ) : null}
           <CanvasZoomControls
             zoom={zoom}
+            defaultZoom={preferences.defaultCanvasZoom}
             onZoomOut={() => updateZoom(-CANVAS_ZOOM_STEP)}
-            onReset={() => setZoom(1)}
+            onReset={() => setZoom(preferences.defaultCanvasZoom)}
             onZoomIn={() => updateZoom(CANVAS_ZOOM_STEP)}
           />
         </div>

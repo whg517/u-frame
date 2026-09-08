@@ -11,6 +11,7 @@ describe("CanvasZoomControls", () => {
     render(
       <CanvasZoomControls
         zoom={0.8}
+        defaultZoom={1.2}
         onZoomOut={zoomOut}
         onReset={reset}
         onZoomIn={zoomIn}
@@ -19,7 +20,7 @@ describe("CanvasZoomControls", () => {
 
     expect(screen.getByText("80%")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "缩小画布" }))
-    fireEvent.click(screen.getByRole("button", { name: "重置画布缩放，当前 80%" }))
+    fireEvent.click(screen.getByRole("button", { name: "重置画布缩放到 120%，当前 80%" }))
     fireEvent.click(screen.getByRole("button", { name: "放大画布" }))
     expect(zoomOut).toHaveBeenCalledOnce()
     expect(reset).toHaveBeenCalledOnce()

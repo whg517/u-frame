@@ -6,11 +6,13 @@ import { MAX_CANVAS_ZOOM, MIN_CANVAS_ZOOM } from "./layout"
 
 export function CanvasZoomControls({
   zoom,
+  defaultZoom,
   onZoomOut,
   onReset,
   onZoomIn,
 }: {
   zoom: number
+  defaultZoom: number
   onZoomOut: () => void
   onReset: () => void
   onZoomIn: () => void
@@ -33,8 +35,11 @@ export function CanvasZoomControls({
         variant="ghost"
         size="sm"
         className="w-14 font-mono tabular-nums"
-        aria-label={t("重置画布缩放，当前 {zoom}%", { zoom: Math.round(zoom * 100) })}
-        title={t("重置为 100%")}
+        aria-label={t("重置画布缩放到 {defaultZoom}%，当前 {zoom}%", {
+          defaultZoom: Math.round(defaultZoom * 100),
+          zoom: Math.round(zoom * 100),
+        })}
+        title={t("重置为默认缩放 {zoom}%", { zoom: Math.round(defaultZoom * 100) })}
         onClick={onReset}
       >
         {Math.round(zoom * 100)}%

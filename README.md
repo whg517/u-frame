@@ -11,7 +11,7 @@ UFrame 是一个面向 macOS 的本地桌面机柜与物理设备资产管理工
 - 通过表单完成首次上架、单设备移动和下架。
 - 在多机柜画布中筛选、缩放、查看详情并拖动调整已上架设备。
 - 对批量位置调整执行边界、重叠和唯一活动放置校验，并在同一 SQLite 事务中保存。
-- 在设置中选择系统/浅色/深色外观、五种主题色及简体中文/英语，偏好在本机即时保存。
+- 在设置中选择系统/浅色/深色外观、五种主题色、简体中文/英语及默认画布缩放，偏好在本机即时保存。
 - 数据保存在本机应用数据目录，不依赖远程服务。
 
 Excel 导入导出、备份恢复、完整审计和正式签名发行仍在后续里程碑中。已实现范围和非目标以 [PRD](docs/PRD.md) 为准。
@@ -65,7 +65,7 @@ pnpm tauri build --debug --bundles app
 - [GitHub 治理](docs/GITHUB_GOVERNANCE.md)
 - [发布规范](docs/RELEASING.md)
 - [变更记录](CHANGELOG.md)
-- [最新迭代验收记录](docs/iterations/0008-settings-preferences.md)
+- [最新迭代验收记录](docs/iterations/0009-default-canvas-zoom.md)
 
 ## 许可证
 
