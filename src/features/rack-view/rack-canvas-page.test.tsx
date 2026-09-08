@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { LocationTreeDto, RackViewDto } from "@/shared/lib/tauri-client/bindings"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
+import { PreferencesProvider } from "@/shared/preferences/preferences-provider"
+import { preferencesStorageKey } from "@/shared/preferences/preferences"
 import { RackCanvasPage } from "./rack-canvas-page"
 
 const locations: LocationTreeDto = {
@@ -38,6 +40,7 @@ const view: RackViewDto = {
   ],
 }
 
+beforeEach(() => window.localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
 
 describe("RackCanvasPage location filters", () => {
@@ -46,11 +49,13 @@ describe("RackCanvasPage location filters", () => {
     vi.spyOn(tauriClient, "getRackView").mockResolvedValue({ racks: [] })
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/"]}>
-          <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
+      <PreferencesProvider>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/"]}>
+            <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </PreferencesProvider>,
     )
 
     expect(screen.getByRole("banner")).toHaveClass("h-24", "shrink-0")
@@ -65,11 +70,13 @@ describe("RackCanvasPage location filters", () => {
     const getRackView = vi.spyOn(tauriClient, "getRackView").mockResolvedValue(view)
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/?room=room-a&area=area-a"]}>
-          <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
+      <PreferencesProvider>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/?room=room-a&area=area-a"]}>
+            <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </PreferencesProvider>,
     )
 
     expect(await screen.findByRole("region", { name: "A-01，18U" })).toBeInTheDocument()
@@ -100,11 +107,13 @@ describe("RackCanvasPage location filters", () => {
     })
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/"]}>
-          <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
+      <PreferencesProvider>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/"]}>
+            <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </PreferencesProvider>,
     )
 
     const device = await screen.findByRole("button", { name: "计算节点，U4 到 U4" })
@@ -136,5 +145,32 @@ describe("RackCanvasPage location filters", () => {
       moves: [{ assetId: "asset-a", rackId: "rack-b", startU: 7 }],
     }))
     await screen.findByRole("button", { name: "编辑布局" })
+  })
+
+  it("starts at the saved default zoom and resets back to it", async () => {
+    window.localStorage.setItem(preferencesStorageKey, JSON.stringify({
+      themeMode: "system",
+      accentColor: "neutral",
+      language: "zh-CN",
+      defaultCanvasZoom: 1.4,
+    }))
+    vi.spyOn(tauriClient, "listLocations").mockResolvedValue(locations)
+    vi.spyOn(tauriClient, "getRackView").mockResolvedValue(view)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <PreferencesProvider>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={["/"]}>
+            <Routes><Route path="/" element={<RackCanvasPage />} /></Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </PreferencesProvider>,
+    )
+
+    const resetZoom = await screen.findByRole("button", { name: "重置画布缩放到 140%，当前 140%" })
+    fireEvent.click(screen.getByRole("button", { name: "缩小画布" }))
+    expect(screen.getByRole("button", { name: "重置画布缩放到 140%，当前 130%" })).toBeInTheDocument()
+    fireEvent.click(resetZoom)
+    expect(screen.getByRole("button", { name: "重置画布缩放到 140%，当前 140%" })).toBeInTheDocument()
   })
 })

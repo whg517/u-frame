@@ -32,6 +32,7 @@ describe("SettingsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "深色" }))
     fireEvent.click(screen.getByRole("button", { name: "蓝色" }))
+    fireEvent.click(screen.getByRole("button", { name: "120%" }))
     fireEvent.click(screen.getByRole("button", { name: "英语" }))
 
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument()
@@ -45,6 +46,7 @@ describe("SettingsPage", () => {
         themeMode: "dark",
         accentColor: "blue",
         language: "en-US",
+        defaultCanvasZoom: 1.2,
       })
     })
   })
@@ -54,6 +56,7 @@ describe("SettingsPage", () => {
       themeMode: "dark",
       accentColor: "violet",
       language: "en-US",
+      defaultCanvasZoom: 1.4,
     }))
     setActiveLanguage("en-US")
     render(<AppProvider><SettingsPage /></AppProvider>)
