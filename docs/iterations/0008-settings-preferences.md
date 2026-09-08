@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |---|---|
-| 状态 | Implemented / Gate passed / Pending visual check |
+| 状态 | Implemented / Verified |
 | 日期 | 2026-09-08 |
 | 分支 | `feat/settings-preferences` |
 | 用户故事 | US-SET-001、US-SET-002 |
@@ -35,8 +35,8 @@
 
 - `pnpm gate`：2026-09-08 通过；文档、版本、bindings、ESLint、TypeScript、49 个前端测试、前端生产构建、Rust format、Debug/Release Clippy 和 17 个 Rust 测试全部通过。
 - React 自动化测试：覆盖偏好容错、DOM 主题属性、即时保存、恢复默认以及语言切换后的固定导航。
-- Tauri Debug 应用已完成编译和启动；macOS 当时处于锁屏状态，主题、语言和重启持久化的可视检查待解锁后执行。
+- Tauri Debug `.app` 已完成构建和真实桌面检查：系统深色、固定浅色、蓝色主题和全局英语均即时生效；资产列表与机柜画布使用英语；关闭并重启后仍保持浅色和英语。
 
 ## 5. 结果
 
-待完整门禁与真实桌面验证通过后记录最终结论。
+Iteration 008 的设置闭环已通过本地完整门禁、GitHub 托管 `quality-gate` 和真实 Tauri 桌面检查。主题色持久化、损坏偏好回退和恢复默认由自动化测试覆盖；本轮没有改变业务数据库或 IPC 契约。
