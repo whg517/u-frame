@@ -23,6 +23,8 @@ ADR 编号沿用现有记录，不为填补空号生成无决策内容的文档�
 
 ## 历史与验收
 
+- [Iteration 015：CI 修复与依赖集成](iterations/0015-ci-dependency-integration.md)
+
 - [Iteration 014：仓库治理评审](iterations/0014-repository-governance.md)
 - [Iteration 013：设计与代码评审](iterations/0013-design-and-code-review.md)
 - 更早的范围和验证证据保留在 iterations 目录，以各次记录对应的提交为准。
