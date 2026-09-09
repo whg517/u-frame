@@ -12,7 +12,14 @@ describe("preferences", () => {
   it("loads valid values and falls back field by field", () => {
     const storage = {
       getItem: (key: string) => key === preferencesStorageKey
-        ? JSON.stringify({ themeMode: "dark", accentColor: "invalid", language: "en-US", defaultCanvasZoom: 1.4 })
+        ? JSON.stringify({
+            themeMode: "dark",
+            accentColor: "invalid",
+            language: "en-US",
+            defaultCanvasZoom: 1.4,
+            interfaceDensity: "compact",
+            interfaceFontSize: "large",
+          })
         : null,
     }
 
@@ -21,6 +28,8 @@ describe("preferences", () => {
       accentColor: "neutral",
       language: "en-US",
       defaultCanvasZoom: 1.4,
+      interfaceDensity: "compact",
+      interfaceFontSize: "large",
     })
   })
 
@@ -37,14 +46,36 @@ describe("preferences", () => {
     }).defaultCanvasZoom).toBe(1)
   })
 
+  it("defaults legacy and unsupported interface sizing values", () => {
+    expect(readPreferences({ getItem: () => JSON.stringify({}) })).toMatchObject({
+      interfaceDensity: "standard",
+      interfaceFontSize: "standard",
+    })
+    expect(readPreferences({
+      getItem: () => JSON.stringify({ interfaceDensity: "dense", interfaceFontSize: "huge" }),
+    })).toMatchObject({
+      interfaceDensity: "standard",
+      interfaceFontSize: "standard",
+    })
+  })
+
   it("resolves system mode and applies document attributes", () => {
     const root = document.createElement("html")
-    applyPreferences({ themeMode: "system", accentColor: "blue", language: "en-US", defaultCanvasZoom: 1.2 }, true, root)
+    applyPreferences({
+      themeMode: "system",
+      accentColor: "blue",
+      language: "en-US",
+      defaultCanvasZoom: 1.2,
+      interfaceDensity: "compact",
+      interfaceFontSize: "large",
+    }, true, root)
 
     expect(isDarkMode("system", true)).toBe(true)
     expect(root).toHaveClass("dark")
     expect(root).toHaveAttribute("data-theme-mode", "system")
     expect(root).toHaveAttribute("data-accent", "blue")
+    expect(root).toHaveAttribute("data-density", "compact")
+    expect(root).toHaveAttribute("data-font-size", "large")
     expect(root).toHaveAttribute("lang", "en-US")
     expect(root.style.colorScheme).toBe("dark")
   })

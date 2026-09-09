@@ -1,11 +1,17 @@
-import { Check, Languages, Paintbrush, RotateCcw, ScanSearch, SunMoon } from "lucide-react"
+import { Check, Languages, Paintbrush, RotateCcw, ScanSearch, SlidersHorizontal, SunMoon, Type } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { t } from "@/shared/i18n/i18n"
 import { usePreferences } from "@/shared/preferences/preferences-provider"
-import type { AccentColor, DefaultCanvasZoom, ThemeMode } from "@/shared/preferences/preferences"
+import type {
+  AccentColor,
+  DefaultCanvasZoom,
+  InterfaceDensity,
+  InterfaceFontSize,
+  ThemeMode,
+} from "@/shared/preferences/preferences"
 
 const themeModes: Array<{ value: ThemeMode; label: "跟随系统" | "浅色" | "深色" }> = [
   { value: "system", label: "跟随系统" },
@@ -26,6 +32,24 @@ const accentColors: Array<{
 ]
 
 const canvasZoomOptions: DefaultCanvasZoom[] = [0.8, 1, 1.2, 1.4]
+
+const densityOptions: Array<{
+  value: InterfaceDensity
+  label: "紧凑密度" | "标准密度" | "宽松密度"
+}> = [
+  { value: "compact", label: "紧凑密度" },
+  { value: "standard", label: "标准密度" },
+  { value: "spacious", label: "宽松密度" },
+]
+
+const fontSizeOptions: Array<{
+  value: InterfaceFontSize
+  label: "小字号" | "标准字号" | "大字号"
+}> = [
+  { value: "small", label: "小字号" },
+  { value: "standard", label: "标准字号" },
+  { value: "large", label: "大字号" },
+]
 
 export function SettingsPage() {
   const { preferences, updatePreferences, resetPreferences } = usePreferences()
@@ -68,6 +92,43 @@ export function SettingsPage() {
                       onClick={() => updatePreferences({ accentColor: option.value })}
                     >
                       <span className="size-3 rounded-full" style={{ backgroundColor: option.swatch }} />
+                      {t(option.label)}
+                    </PreferenceButton>
+                  ))}
+                </div>
+              </fieldset>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><SlidersHorizontal className="size-4" /> {t("界面尺寸")}</CardTitle>
+              <CardDescription>{t("分别调整内容间距和文字大小，所有页面会保持一致。")}</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-7">
+              <fieldset className="grid gap-3">
+                <legend className="mb-1 text-sm font-medium">{t("界面密度")}</legend>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {densityOptions.map((option) => (
+                    <PreferenceButton
+                      key={option.value}
+                      selected={preferences.interfaceDensity === option.value}
+                      onClick={() => updatePreferences({ interfaceDensity: option.value })}
+                    >
+                      {t(option.label)}
+                    </PreferenceButton>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="grid gap-3">
+                <legend className="mb-1 flex items-center gap-2 text-sm font-medium"><Type className="size-4" /> {t("界面字号")}</legend>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {fontSizeOptions.map((option) => (
+                    <PreferenceButton
+                      key={option.value}
+                      selected={preferences.interfaceFontSize === option.value}
+                      onClick={() => updatePreferences({ interfaceFontSize: option.value })}
+                    >
                       {t(option.label)}
                     </PreferenceButton>
                   ))}
@@ -123,7 +184,7 @@ export function SettingsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-5 py-4">
             <div>
               <p className="text-sm font-medium">{t("当前设置会自动保存，不需要单独确认。")}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t("默认使用系统外观、中性灰主题色、简体中文和 100% 画布缩放。")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("默认使用系统外观、中性灰主题色、简体中文、标准界面尺寸和 100% 画布缩放。")}</p>
             </div>
             <Button variant="outline" onClick={resetPreferences}><RotateCcw /> {t("恢复默认设置")}</Button>
           </div>

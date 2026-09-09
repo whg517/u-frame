@@ -3,12 +3,16 @@ import type { AppLanguage } from "@/shared/i18n/i18n"
 export type ThemeMode = "system" | "light" | "dark"
 export type AccentColor = "neutral" | "blue" | "green" | "orange" | "violet"
 export type DefaultCanvasZoom = 0.8 | 1 | 1.2 | 1.4
+export type InterfaceDensity = "compact" | "standard" | "spacious"
+export type InterfaceFontSize = "small" | "standard" | "large"
 
 export interface Preferences {
   themeMode: ThemeMode
   accentColor: AccentColor
   language: AppLanguage
   defaultCanvasZoom: DefaultCanvasZoom
+  interfaceDensity: InterfaceDensity
+  interfaceFontSize: InterfaceFontSize
 }
 
 export const preferencesStorageKey = "uframe.preferences.v1"
@@ -18,12 +22,16 @@ export const defaultPreferences: Preferences = {
   accentColor: "neutral",
   language: "zh-CN",
   defaultCanvasZoom: 1,
+  interfaceDensity: "standard",
+  interfaceFontSize: "standard",
 }
 
 const themeModes = new Set<ThemeMode>(["system", "light", "dark"])
 const accentColors = new Set<AccentColor>(["neutral", "blue", "green", "orange", "violet"])
 const languages = new Set<AppLanguage>(["zh-CN", "en-US"])
 const defaultCanvasZooms = new Set<DefaultCanvasZoom>([0.8, 1, 1.2, 1.4])
+const interfaceDensities = new Set<InterfaceDensity>(["compact", "standard", "spacious"])
+const interfaceFontSizes = new Set<InterfaceFontSize>(["small", "standard", "large"])
 
 export function readPreferences(storage: Pick<Storage, "getItem"> = window.localStorage): Preferences {
   try {
@@ -37,6 +45,12 @@ export function readPreferences(storage: Pick<Storage, "getItem"> = window.local
       defaultCanvasZoom: parsed.defaultCanvasZoom && defaultCanvasZooms.has(parsed.defaultCanvasZoom)
         ? parsed.defaultCanvasZoom
         : defaultPreferences.defaultCanvasZoom,
+      interfaceDensity: parsed.interfaceDensity && interfaceDensities.has(parsed.interfaceDensity)
+        ? parsed.interfaceDensity
+        : defaultPreferences.interfaceDensity,
+      interfaceFontSize: parsed.interfaceFontSize && interfaceFontSizes.has(parsed.interfaceFontSize)
+        ? parsed.interfaceFontSize
+        : defaultPreferences.interfaceFontSize,
     }
   } catch {
     return defaultPreferences
@@ -67,6 +81,8 @@ export function applyPreferences(
   root.classList.toggle("dark", dark)
   root.dataset.themeMode = preferences.themeMode
   root.dataset.accent = preferences.accentColor
+  root.dataset.density = preferences.interfaceDensity
+  root.dataset.fontSize = preferences.interfaceFontSize
   root.lang = preferences.language
   root.style.colorScheme = dark ? "dark" : "light"
 }

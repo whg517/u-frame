@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.12 |
-| 更新日期 | 2026-09-08 |
+| 版本 | v0.13 |
+| 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
 | 关联文档 | [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [开发规范](DEVELOPMENT_GUIDE.md) |
@@ -163,7 +163,7 @@ src/
 | 当前筛选、搜索词、当前画布缩放、选中设备 | 页面或 feature 本地状态 |
 | 机柜横向展示顺序 | Rust + SQLite `racks.sort_order` |
 | 表单草稿与字段错误 | React Hook Form |
-| 外观、主题色、语言和默认画布缩放偏好 | React Context + 带版本的 `localStorage`，启动渲染前恢复 |
+| 外观、主题色、语言、默认画布缩放、界面密度和字号偏好 | React Context + 带版本的 `localStorage`，启动渲染前恢复 |
 
 ### 5.4 实体详情与路由
 
@@ -205,7 +205,7 @@ src/
 
 ### 5.7 本地偏好与界面国际化
 
-- 外观、主题色、语言和默认画布缩放是设备本地 UI 偏好，不属于机房资产业务数据，不写入 SQLite，也不新增 Tauri Command。
+- 外观、主题色、语言、默认画布缩放、界面密度和字号是设备本地 UI 偏好，不属于机房资产业务数据，不写入 SQLite，也不新增 Tauri Command。
 - 偏好使用带版本的 `uframe.preferences.v1` 键保存到 WebView `localStorage`；读取时逐字段校验，缺失、未知值或损坏 JSON 回退到默认值。
 - 应用入口在 React 首次渲染前恢复偏好，设置根节点的 `dark` class、`data-theme-mode`、`data-accent`、`lang` 和 `color-scheme`，避免首屏出现明显闪烁。
 - `PreferencesProvider` 负责即时更新、持久化和监听 `prefers-color-scheme`；跟随系统模式仅响应系统明暗变化，不改变已保存选项。
@@ -215,6 +215,9 @@ src/
 - 表单 Zod schema 在页面挂载时按当前语言创建，Rust 稳定错误码在展示时映射到当前语言。
 - 设置页位于 `/settings`，更改立即生效并自动保存；恢复默认只重置 UI 偏好，不修改任何业务数据。
 - 默认画布缩放只提供位于现有 50%–160% 边界内的 80%、100%、120% 和 140% 四档；旧偏好缺失或值无效时逐字段回退到 100%。
+- 界面密度通过根节点 `data-density` 覆盖 Tailwind `--spacing` 语义 token：紧凑、标准、宽松分别为 `0.225rem`、`0.25rem` 和 `0.275rem`；所有 spacing utility 因而保持同一比例。
+- 界面字号通过根节点 `data-font-size` 设置 `14px`、`16px` 或 `18px` 基准，使文字和 rem 控件共同缩放；机柜 U 高度和拖动计算继续使用固定像素几何，不受该偏好影响。
+- 密度和字号默认均为标准档；旧偏好缺失、未知值或损坏 JSON 继续使用逐字段回退，不阻止应用启动。
 
 ## 6. Rust 后端设计
 
@@ -658,3 +661,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.10 | 2026-09-07 | 采用固定工具链、GitHub `quality-gate`、Universal DMG 以及 tag 驱动的签名公证 Draft Release 流程。 |
 | v0.11 | 2026-09-08 | 记录本地 UI 偏好、语义主题色、全局双语资源、启动前恢复和容错持久化方案。 |
 | v0.12 | 2026-09-08 | 将默认机柜画布缩放纳入本地偏好，并明确进入画布与缩放重置行为。 |
+| v0.13 | 2026-09-09 | 增加根节点界面密度与字号 token、默认值、旧偏好兼容和机柜几何隔离约束。 |
