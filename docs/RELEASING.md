@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.0 |
-| 更新日期 | 2026-09-07 |
+| 版本 | v1.1 |
+| 更新日期 | 2026-09-09 |
 | 适用范围 | GitHub Release 分发的 macOS Universal DMG |
 | 关联文档 | [开发规范](DEVELOPMENT_GUIDE.md) · [GitHub 治理](GITHUB_GOVERNANCE.md) · [技术设计](TECHNICAL_DESIGN.md) · [变更记录](../CHANGELOG.md) |
 
@@ -13,7 +13,7 @@
 - Sprint、合并和发布不是一一对应关系；`main` 可以持续集成，只有经过验收的版本才创建 Release。
 - 正式发行使用 SemVer tag `vMAJOR.MINOR.PATCH`；预发行允许 `vMAJOR.MINOR.PATCH-rc.N`。
 - 应用版本、Git tag、完整 Git SHA、DMG 文件和 SHA-256 摘要必须可相互追踪。
-- 同一 tag 只构建一次候选制品。失败或需要代码修正时提升版本并创建新 tag，不移动已发布 tag。
+- 同一 tag 只对应一组最终候选制品；需要代码修正时提升版本并创建新 tag。未生成可用 Draft 的外部服务短暂故障允许原源码重试，不移动 tag 或覆盖已经发布的资产。
 - 自动化只创建 Draft Release；维护者完成安装验收后人工发布。
 - 对外 DMG 必须使用 Developer ID Application 签名并完成 Apple notarization，不提供静默降级的未签名正式包。
 
@@ -71,14 +71,13 @@ git push origin v0.1.0
 
 Tag push 触发 [Release workflow](../.github/workflows/release.yml)：
 
-1. 确认六项 Apple secrets 全部存在。
-2. 确认三个应用版本与 tag 完全一致。
-3. 确认 tag 是 annotated tag，且目标提交属于 `origin/main`。
-4. 安装锁定工具链和依赖，执行完整 `pnpm gate`。
-5. 为 Intel 和 Apple Silicon 构建 Universal `.app` 与 `.dmg`。
-6. Tauri 使用环境凭据完成签名和 notarization。
-7. 使用 `codesign` 和 `xcrun stapler` 验证 `.app`、`.dmg`，生成 `SHA256SUMS`。
-8. 创建包含 DMG 和摘要的 Draft GitHub Release；预发行 tag 自动标记为 prerelease。
+1. 在独立只读 verify-source job 确认四处应用版本（含 Cargo.lock）与 tag 一致，tag 是 annotated tag 且目标提交属于 origin/main。
+2. 读取仓库工具链文件，安装锁定依赖，执行完整 pnpm gate；本 job 不使用发布 environment。
+3. 成功后在新的签名 runner 重新检出并检查同一来源，安装工具链与依赖。
+4. 只在 signed_build 步骤注入并检查六项 Apple secrets，再为 Intel 和 Apple Silicon 构建 Universal app/DMG，完成签名与 notarization。
+5. 拒绝缺少或多份候选 app/DMG；读取 app 的 CFBundleExecutable，使用 lipo 检查 arm64 与 x86_64。
+6. codesign 验证 app 与 DMG 签名；spctl 检查 app Gatekeeper；xcrun stapler 验证 app 与 DMG 的 ticket。全部成功后原子写入 SHA256SUMS。
+7. publish 步骤仅接收 GitHub token，再次计算当前唯一 DMG 摘要并与验证文件精确比对，然后创建 Draft；预发行 tag 标记 prerelease。
 
 任一步失败都不得人工上传同名“临时修复包”冒充流水线产物。修复代码或配置后创建新版本 tag；如果只是可重试的 GitHub/Apple 短暂故障，可以在不改变源码和 tag 的前提下重跑失败 job。
 
@@ -124,3 +123,12 @@ pnpm release:build
 - [Tauri macOS 代码签名](https://v2.tauri.app/distribute/sign/macos/)
 - [GitHub Actions 安全加固](https://docs.github.com/en/code-security/tutorials/secure-your-organization/protect-against-threats)
 - [GitHub Immutable Releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
+- [GitHub Actions 安全使用](https://docs.github.com/en/actions/reference/security/secure-use)
+- [Apple Universal 二进制](https://developer.apple.com/documentation/apple-silicon/building-a-universal-macos-binary)
+
+## 10. 变更记录
+
+| 版本 | 日期 | 说明 |
+|---|---|---|
+| v1.0 | 2026-09-07 | 建立 macOS Universal 签名公证与 Draft 安装验收流程。 |
+| v1.1 | 2026-09-09 | 分离来源验证与签名，明确唯一制品、双架构、双签名和发布前摘要复核，澄清不可变 tag 重试边界。 |

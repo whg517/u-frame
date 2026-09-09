@@ -13,7 +13,18 @@ git diff --check
 git diff --cached --check
 
 printf '%s\n' '[gate] shell syntax'
-bash -n scripts/gate.sh scripts/verify-macos-release.sh .githooks/pre-commit
+for gate_shell in scripts/*.sh scripts/lib/*.sh .githooks/pre-commit; do
+  bash -n "${gate_shell}"
+done
+
+printf '%s\n' '[gate] repository and workflow policies'
+pnpm governance:check
+
+printf '%s\n' '[gate] tooling regression tests'
+pnpm test:tools
+
+printf '%s\n' '[gate] standalone domain boundary'
+pnpm domain:check
 
 printf '%s\n' '[gate] documentation'
 pnpm docs:check

@@ -413,6 +413,62 @@ async fn failed_move_keeps_original_placement_active() {
 }
 
 #[tokio::test]
+async fn batch_insert_failure_rolls_back_ended_rows_and_partial_inserts() {
+    let state = fixture().await;
+    seed_dev_data(&state.pool, "seed").await.unwrap();
+    let before = list_assets(&state.pool, "read").await.unwrap();
+    let moving = ["计算节点 01", "核心交换机"]
+        .iter()
+        .map(|name| before.iter().find(|asset| asset.name == *name).unwrap())
+        .collect::<Vec<_>>();
+    let rack_id = moving[0].placement.as_ref().unwrap().rack_id.clone();
+    let history_before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rack_placements")
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    // The second insertion fails after all old rows ended and the first insert succeeded.
+    sqlx::query(
+        "CREATE TRIGGER fail_second_insert BEFORE INSERT ON rack_placements
+        WHEN NEW.start_u = 24 BEGIN SELECT RAISE(ABORT, 'injected write failure'); END",
+    )
+    .execute(&state.pool)
+    .await
+    .unwrap();
+    let error = move_assets(
+        &state.pool,
+        MoveAssetsInput {
+            moves: moving
+                .iter()
+                .zip([20, 24])
+                .map(|(asset, start_u)| AssetPlacementMoveInput {
+                    asset_id: asset.id.clone(),
+                    rack_id: rack_id.clone(),
+                    start_u,
+                })
+                .collect(),
+        },
+        "rollback-test",
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code, "Database.OperationFailed");
+    assert_eq!(error.operation_id, "rollback-test");
+    let after = list_assets(&state.pool, "read").await.unwrap();
+    for original in &before {
+        let current = after.iter().find(|asset| asset.id == original.id).unwrap();
+        assert_eq!(
+            serde_json::to_value(&current.placement).unwrap(),
+            serde_json::to_value(&original.placement).unwrap()
+        );
+    }
+    let history_after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rack_placements")
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    assert_eq!(history_after, history_before);
+}
+
+#[tokio::test]
 async fn development_seed_is_manual_and_idempotent() {
     let state = fixture().await;
     let first = seed_dev_data(&state.pool, "op").await.unwrap();

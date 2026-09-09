@@ -14,10 +14,17 @@ export default tseslint.config(
     files: ["**/*.{js,mjs,cjs,ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2022,
-      globals: { ...globals.browser, ...globals.node },
     },
     plugins: { "react-refresh": reactRefresh },
     rules: { "react-refresh/only-export-components": "off" },
+  },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    languageOptions: { globals: globals.browser },
+  },
+  {
+    files: ["*.{js,mjs,ts}", "scripts/**/*.{js,mjs}"],
+    languageOptions: { globals: globals.node },
   },
   {
     files: ["src/**/*.{ts,tsx}"],

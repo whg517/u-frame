@@ -1,0 +1,22 @@
+{
+  ".editorconfig": "跨编辑器文本格式",
+  ".gitattributes": "Git 文本换行和二进制识别",
+  ".gitignore": "本地数据、凭据与构建产物排除",
+  ".node-version": "Node 工具链版本真相源",
+  "AGENTS.md": "Agent 执行约束与导航",
+  "CHANGELOG.md": "用户可见版本变化",
+  "CONTRIBUTING.md": "贡献者流程入口",
+  "README.md": "产品与开发入口",
+  "SECURITY.md": "安全报告与支持政策",
+  "components.json": "shadcn 生成配置",
+  "eslint.config.js": "JavaScript/TypeScript 与层依赖规则",
+  "index.html": "WebView 本地入口",
+  "package.json": "包元信息、依赖与命令",
+  "pnpm-lock.yaml": "JavaScript 依赖锁",
+  "pnpm-workspace.yaml": "依赖构建脚本许可",
+  "rust-toolchain.toml": "Rust 工具链版本真相源",
+  "tsconfig.json": "应用 TypeScript 严格检查",
+  "tsconfig.node.json": "构建配置 TypeScript 严格检查",
+  "vite.config.ts": "前端构建与开发服务",
+  "vitest.config.ts": "UI 测试配置"
+}

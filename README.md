@@ -65,8 +65,10 @@ pnpm tauri build --debug --bundles app
 - [GitHub 治理](docs/GITHUB_GOVERNANCE.md)
 - [发布规范](docs/RELEASING.md)
 - [变更记录](CHANGELOG.md)
-- [最新设计评审与迭代验收记录](docs/iterations/0013-design-and-code-review.md)
+- [最新仓库治理评审与验收记录](docs/iterations/0014-repository-governance.md)
 
 ## 许可证
 
 当前仓库未授予开源许可证。除非后续明确选择并加入许可证，否则保留所有权利。
+- [完整文档索引](docs/README.md)
+- [仓库治理规范](docs/REPOSITORY_GOVERNANCE.md)

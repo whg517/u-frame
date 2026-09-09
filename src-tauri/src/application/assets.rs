@@ -1,7 +1,8 @@
+use crate::infrastructure::database_error::database_error;
 use sqlx::{Row, SqlitePool};
 
 use crate::{
-    domain,
+    application::validation as domain,
     dto::{AssetDto, CreateAssetInput, UpdateAssetInput},
     error::AppErrorDto,
     infrastructure::repository,
@@ -16,7 +17,7 @@ pub async fn list_assets(
     repository::list_assets(pool)
         .await
         .map(|rows| rows.into_iter().map(asset_dto).collect())
-        .map_err(|error| AppErrorDto::database(operation_id, error))
+        .map_err(|error| database_error(operation_id, error))
 }
 
 pub async fn create_asset(
@@ -61,7 +62,7 @@ pub async fn create_asset(
     .bind(&timestamp)
     .execute(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     Ok(AssetDto {
         id: asset_id,
         asset_type: input.asset_type,
@@ -99,7 +100,7 @@ pub async fn update_asset(
     let mut transaction = pool
         .begin()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let current = sqlx::query(
         r#"
         SELECT asset.id, placement.id AS placement_id, placement.rack_id, placement.start_u,
@@ -114,7 +115,7 @@ pub async fn update_asset(
     .bind(&asset_id)
     .fetch_optional(&mut *transaction)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     let Some(current) = current else {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -145,7 +146,7 @@ pub async fn update_asset(
         .bind(start_u)
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
         if let Some(conflicting_asset_id) = conflict {
             return Err(AppErrorDto::placement(
                 operation_id,
@@ -183,14 +184,14 @@ pub async fn update_asset(
     .bind(&asset_id)
     .execute(&mut *transaction)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     transaction
         .commit()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     repository::find_asset(pool, &asset_id)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?
+        .map_err(|error| database_error(operation_id, error))?
         .map(asset_dto)
         .ok_or_else(|| {
             AppErrorDto::validation(

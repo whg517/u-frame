@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.3 |
-| 更新日期 | 2026-09-07 |
+| 版本 | v1.4 |
+| 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame 全部代码、文档和配置变更 |
 | 关联文档 | [项目协作指南](../AGENTS.md) · [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [技术设计](TECHNICAL_DESIGN.md) |
 
@@ -151,18 +151,23 @@ pnpm gate
 | 阶段 | 命令或检查 | 当前状态 |
 |---|---|---|
 | Git 空白错误 | `git diff --check`、`git diff --cached --check` | 已建立 |
-| Shell 语法 | `bash -n scripts/gate.sh scripts/verify-macos-release.sh .githooks/pre-commit` | 已建立 |
+| Shell 语法 | scripts 根级和 lib 下全部 Shell、pre-commit 的 bash -n | 已建立 |
+| 仓库治理 | `pnpm governance:check`：根清单、工作流和架构边界 | 已建立 |
+| 脚本反例 | `pnpm test:tools` | 已建立 |
+| 独立领域 | `pnpm domain:check`：仅 rustc 编译 Domain | 已建立 |
 | 文档一致性 | `pnpm docs:check` | 已建立 |
-| 应用版本 | `pnpm version:check` | 已建立 |
+| 应用版本 | `pnpm version:check`：包含 Cargo.lock 的四处版本 | 已建立 |
+| IPC 一致性 | `pnpm bindings:check` | 已建立 |
 | 前端 lint | `pnpm lint` | 已建立 |
+| TypeScript | `pnpm typecheck`：业务与 Node 配置均 strict | 已建立 |
 | 前端测试 | `pnpm test` | 已建立 |
 | 前端类型与构建 | `pnpm build` | 已建立 |
 | Rust 格式 | `cargo fmt --check` | 已建立 |
-| Rust 编译 | `cargo check` | 已建立 |
-| Rust lint | `cargo clippy -- -D warnings` | 已建立 |
-| Rust 测试 | `cargo test` | 已建立 |
+| Rust Debug lint | Clippy --all-targets --all-features -- -D warnings | 已建立 |
+| Rust Release lint | Clippy --release -- -D warnings | 已建立 |
+| Rust 测试 | cargo test --all-targets | 已建立 |
 
-前端业务实现开始前，必须建立非 watch 模式的 `lint` 和 `test` scripts。加入这些 scripts 的同一变更必须确保 `pnpm gate` 会真实执行它们。
+执行细节以 [scripts/gate.sh](../scripts/gate.sh) 为准。CI 从 .node-version、rust-toolchain.toml 和 packageManager 安装锁定基线。package.json engines 允许 Node 22.23.2+（22.x）或 24.20.0+（24.x）的本地验证，但兼容版本通过不能替代锁定 CI；报告必须记录实际 node、pnpm、rustc 版本。
 
 ### 5.1 文档门禁
 
@@ -172,7 +177,7 @@ pnpm gate
 - fenced code block 成对闭合。
 - 相对 Markdown 链接目标存在。
 - 用户故事编号不重复。
-- PRD 中的需求编号全部出现在用户故事文档中。
+- PRD 需求不重复、被真实故事引用覆盖；拒绝未定义需求、故事悬空引用，以及只把 US- 前缀故事编号当需求覆盖。
 
 ### 5.2 门禁失败处理
 
@@ -318,3 +323,4 @@ pnpm release:build
 | v1.1 | 2026-09-04 | 结束引导例外，记录已启用的完整本地门禁和无远程仓库时的 worktree 基线。 |
 | v1.2 | 2026-09-04 | 修正前端 lint、测试和 Rust 测试已纳入门禁的当前状态。 |
 | v1.3 | 2026-09-07 | 记录 GitHub 远程、CI required check、版本一致性门禁和 macOS Universal 签名公证发布流程。 |
+| v1.4 | 2026-09-09 | 对齐实际门禁顺序，增加治理/脚本/领域隔离/配置类型检查，明确工具链证据与文档提交纪律。 |

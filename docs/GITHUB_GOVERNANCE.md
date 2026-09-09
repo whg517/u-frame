@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.0 |
-| 更新日期 | 2026-09-07 |
+| 版本 | v1.1 |
+| 更新日期 | 2026-09-09 |
 | 仓库 | `whg517/u-frame` |
 | 关联文档 | [贡献指南](../CONTRIBUTING.md) · [开发规范](DEVELOPMENT_GUIDE.md) · [发布规范](RELEASING.md) · [安全策略](../SECURITY.md) |
 
@@ -57,7 +57,7 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 
 ### Release
 
-[Release workflow](../.github/workflows/release.yml) 仅响应 `v*.*.*` tag，使用 `release` environment 和 `contents: write`。它在创建 Draft Release 前验证版本、tag、主线归属、完整门禁、签名、公证、staple 和 SHA-256 摘要。GitHub Release 的人工发布步骤不会由 tag push 自动替代。
+[Release workflow](../.github/workflows/release.yml) 仅响应 `v*.*.*` tag，默认 `contents: read`。verify-source 在无发布 environment 的独立 job 验证四处版本、annotated tag、主线归属并执行完整门禁。随后 macos-universal job 才使用 `release` environment 和 `contents: write`，重检来源并执行签名、双架构、公证、staple、Gatekeeper 与摘要验证，只创建 Draft。GitHub Release 的人工发布步骤不会由 tag push 自动替代。
 
 ### 依赖更新
 
@@ -69,9 +69,11 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 - 每个 workflow 显式声明最小 `GITHUB_TOKEN` 权限。
 - 外部 Action 固定到完整 commit SHA，并由 Dependabot 提交更新 PR。
 - CI 不读取发布证书或 Apple 凭据。
-- 发布凭据只保存在 GitHub `release` environment secrets 中，脚本只检查是否存在，不打印值。
+- 发布凭据只保存在 GitHub `release` environment secrets 中，仅注入 signed_build 步骤；GitHub token 仅显式注入 publish 步骤。脚本只检查是否存在，不打印值。step env 收窄意外暴露范围，但不是供应链或进程隔离沙箱。
 - Release 只从 `main` 中的 annotated tag 构建；不接受任意分支输入或动态脚本 URL。
 - 构建产物不回写 Git，不把证书、数据库或用户数据打包进 Release。
+- pnpm 版本由 packageManager、Node 由 .node-version、Rust 由 rust-toolchain.toml 提供，不在 workflow 重复维护。
+- 本仓库的 workflow policy 检查 SHA、只读默认、超时、禁止特权触发、凭据位置和发布验证先后；不能替代 GitHub 的实际工作流运行或远程保护设置验证。
 
 ## 6. 安全功能与后续增强
 
@@ -86,3 +88,10 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 ## 7. 管理审计
 
 每次调整仓库可见性、合并策略、保护规则、Actions 权限、环境或安全功能时，应在对应 Issue 或 PR 中记录：变更人、原因、日期、预期效果和验证结果。仓库 UI 中“已设置”不等于流程已验证；必须用实际 PR 或发行候选运行证明规则生效。
+
+## 变更记录
+
+| 版本 | 日期 | 说明 |
+|---|---|---|
+| v1.0 | 2026-09-07 | 建立 GitHub 协作、权限和发布治理。 |
+| v1.1 | 2026-09-09 | 分离来源验证与签名 job，收窄凭据和写权限范围，增加可执行 workflow 政策。 |

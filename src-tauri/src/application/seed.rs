@@ -1,3 +1,4 @@
+use crate::infrastructure::database_error::database_error;
 use sqlx::SqlitePool;
 
 use crate::{dto::SeedResultDto, error::AppErrorDto, infrastructure::repository};
@@ -11,16 +12,16 @@ pub async fn seed_dev_data(
     let mut transaction = pool
         .begin()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let row_count = repository::core_row_count(&mut *transaction)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     if row_count > 0 {
         let fixture_exists: i32 =
             sqlx::query_scalar("SELECT COUNT(*) FROM rooms WHERE code = 'DEV-LAB'")
                 .fetch_one(&mut *transaction)
                 .await
-                .map_err(|error| AppErrorDto::database(operation_id, error))?;
+                .map_err(|error| database_error(operation_id, error))?;
         if fixture_exists > 0 {
             return Ok(SeedResultDto {
                 seeded: false,
@@ -43,10 +44,10 @@ pub async fn seed_dev_data(
     let area_id = id();
     sqlx::query("INSERT INTO rooms (id, code, name, description, status, created_at, updated_at) VALUES (?, 'DEV-LAB', '研发实验室', '仅用于调试构建的样例机房', 'active', ?, ?)")
         .bind(&room_id).bind(&timestamp).bind(&timestamp).execute(&mut *transaction).await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     sqlx::query("INSERT INTO areas (id, room_id, code, name, description, status, created_at, updated_at) VALUES (?, ?, 'A', 'A 区', NULL, 'active', ?, ?)")
         .bind(&area_id).bind(&room_id).bind(&timestamp).bind(&timestamp).execute(&mut *transaction).await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
 
     let racks = [
         (id(), "A-01", "42U", 42_i32),
@@ -56,7 +57,7 @@ pub async fn seed_dev_data(
     for (sort_order, (rack_id, code, specification, total_u)) in racks.iter().enumerate() {
         sqlx::query("INSERT INTO racks (id, area_id, code, specification, total_u, power_capacity_w, status, notes, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?, NULL, 'active', NULL, ?, ?, ?)")
             .bind(rack_id).bind(&area_id).bind(code).bind(specification).bind(total_u).bind(&timestamp).bind(&timestamp).bind(sort_order as i64).execute(&mut *transaction).await
-            .map_err(|error| AppErrorDto::database(operation_id, error))?;
+            .map_err(|error| database_error(operation_id, error))?;
     }
 
     let assets = [
@@ -109,19 +110,19 @@ pub async fn seed_dev_data(
     for (asset_id, asset_type, name, hostname, intranet_ip, height_u, status) in &assets {
         sqlx::query("INSERT INTO assets (id, type, name, hostname, intranet_ip, management_ip, serial_number, vendor, model, purpose, height_u, status, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, ?, ?)")
             .bind(asset_id).bind(asset_type).bind(name).bind(hostname).bind(intranet_ip).bind(height_u).bind(status).bind(&timestamp).bind(&timestamp).execute(&mut *transaction).await
-            .map_err(|error| AppErrorDto::database(operation_id, error))?;
+            .map_err(|error| database_error(operation_id, error))?;
     }
     for (asset_index, rack_index, start_u) in
         [(0_usize, 0_usize, 4_i32), (1, 0, 10), (2, 1, 5), (3, 2, 2)]
     {
         sqlx::query("INSERT INTO rack_placements (id, rack_id, asset_id, start_u, height_u, placed_at, removed_at) VALUES (?, ?, ?, ?, ?, ?, NULL)")
             .bind(id()).bind(&racks[rack_index].0).bind(&assets[asset_index].0).bind(start_u).bind(assets[asset_index].5).bind(&timestamp).execute(&mut *transaction).await
-            .map_err(|error| AppErrorDto::database(operation_id, error))?;
+            .map_err(|error| database_error(operation_id, error))?;
     }
     transaction
         .commit()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     Ok(SeedResultDto {
         seeded: true,
         rooms: 1,
