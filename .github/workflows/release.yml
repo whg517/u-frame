@@ -118,14 +118,20 @@ jobs:
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --all-targets
       - name: Build native installer
         run: pnpm tauri build --target "$RUST_TARGET" --bundles "$BUNDLES"
-      - name: Verify macOS ad-hoc signature
-        if: runner.os == 'macOS'
-        run: codesign --verify --deep --strict "src-tauri/target/$RUST_TARGET/release/bundle/macos/UFrame.app"
       - name: Validate and collect package
         run: |
           binary="src-tauri/target/$RUST_TARGET/release/u-frame"
           if [[ "$RELEASE_TARGET" == "windows-amd64" ]]; then binary="$binary.exe"; fi
-          if [[ "$RELEASE_TARGET" == "macos-arm64" ]]; then binary="src-tauri/target/$RUST_TARGET/release/bundle/macos/UFrame.app/Contents/MacOS/u-frame"; fi
+          if [[ "$RELEASE_TARGET" == "macos-arm64" ]]; then
+            shopt -s nullglob
+            images=(src-tauri/target/"$RUST_TARGET"/release/bundle/dmg/*.dmg)
+            [[ ${#images[@]} -eq 1 ]] || { echo "Expected exactly one DMG" >&2; exit 1; }
+            mount_point=$(mktemp -d "$RUNNER_TEMP/uframe-dmg.XXXXXX")
+            hdiutil attach -readonly -nobrowse -mountpoint "$mount_point" "${images[0]}"
+            trap 'hdiutil detach "$mount_point"' EXIT
+            codesign --verify --deep --strict "$mount_point/UFrame.app"
+            binary="$mount_point/UFrame.app/Contents/MacOS/u-frame"
+          fi
           node scripts/release-artifacts.mjs collect "$RELEASE_TARGET" "src-tauri/target/$RUST_TARGET/release/bundle" "$binary" "$RUNNER_TEMP/release-assets"
       - name: Upload verified build
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

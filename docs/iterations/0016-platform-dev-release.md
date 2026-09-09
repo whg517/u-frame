@@ -18,7 +18,8 @@ macOS arm64 DMG、Windows amd64 NSIS EXE、Linux amd64/arm64 DEB，通过 GitHub
 
 ## 验证记录
 
-- 本地 pnpm gate 已通过，包含 78 项前端、25 项 Rust 测试（含 9 项独立 Domain）；发布脚本增补后共 18 项工具测试通过，提交钩子再次执行完整门禁。
+- 本地 pnpm gate 已通过，包含 78 项前端、25 项 Rust 测试（含 9 项独立 Domain）；发布脚本增补后共 19 项工具测试，提交钩子再次执行完整门禁。
+- PR 试构建发现 Tauri 在仅生成 DMG 时清理临时 `.app`；改为只读挂载最终 DMG，校验其中应用的 ad-hoc 签名与 ARM64 架构。回归测试覆盖挂载内路径、校验失败阻止收集和退出时卸载。
 - PR 四平台试构建必须完成，PR 不得发布。
 - main CI、annotated tag、Release 四目标和下载后摘要必须复核；精确 SHA、run 和下载链接记录在发布 Issue/PR。
 - 自动构建和单元测试不等于四平台人工安装、首次启动与交互验收；本轮未执行的项目明确保留。

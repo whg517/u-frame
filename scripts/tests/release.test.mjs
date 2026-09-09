@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
+import { parse } from "yaml"
 import { collect, verify } from "../release-artifacts.mjs"
 import { assetName, devPublishArgs, digest, findDraftRelease, publishArgs, targets, verifyBinary, verifyUploadedAssets } from "../lib/release-policy.mjs"
 
@@ -84,6 +85,41 @@ test("collection rejects missing or ambiguous packages and mismatched executable
   run()
   assert.equal(JSON.parse(readFileSync(join(output, "manifest.json"), "utf8")).commit, commit)
   assert.throws(run, /empty/)
+})
+
+test("macOS collection verifies the final mounted DMG and detaches on failure", (t) => {
+  const path = directory(t)
+  const bin = join(path, "bin")
+  const dmg = join(path, "src-tauri/target/aarch64-apple-darwin/release/bundle/dmg")
+  mkdirSync(bin)
+  mkdirSync(dmg, { recursive: true })
+  writeFileSync(join(dmg, "UFrame.dmg"), "fixture")
+  const log = join(path, "calls")
+  for (const name of ["hdiutil", "codesign", "node"]) {
+    writeFileSync(join(bin, name), `#!/usr/bin/env bash
+printf '%s %s\\n' '${name}' "$*" >> "$TEST_LOG"
+if [[ '${name}' == codesign ]]; then exit "\${TEST_SIGNATURE_EXIT:-0}"; fi
+`, { mode: 0o755 })
+  }
+  const workflow = parse(readFileSync(join(root, ".github/workflows/release.yml"), "utf8"))
+  const script = workflow.jobs.build.steps.find((step) => step.name === "Validate and collect package").run
+  const run = (signatureExit) => spawnSync("bash", ["-e", "-o", "pipefail", "-c", script], {
+    cwd: path, encoding: "utf8", env: { ...process.env, PATH: `${bin}:${process.env.PATH}`,
+      TEST_LOG: log, TEST_SIGNATURE_EXIT: signatureExit, RUNNER_TEMP: path,
+      RELEASE_TARGET: "macos-arm64", RUST_TARGET: "aarch64-apple-darwin" },
+  })
+  assert.equal(run("0").status, 0)
+  const calls = readFileSync(log, "utf8").trim().split("\n")
+  assert.equal(calls.length, 4)
+  assert.match(calls[0], /^hdiutil attach -readonly -nobrowse -mountpoint /)
+  assert.match(calls[1], /^codesign --verify --deep --strict .*uframe-dmg\..*\/UFrame.app$/)
+  assert.match(calls[2], /uframe-dmg\..*\/UFrame.app\/Contents\/MacOS\/u-frame/)
+  assert.match(calls[3], /^hdiutil detach /)
+  writeFileSync(log, "")
+  assert.notEqual(run("1").status, 0)
+  const failedCalls = readFileSync(log, "utf8")
+  assert.doesNotMatch(failedCalls, /node scripts/)
+  assert.match(failedCalls, /hdiutil detach /)
 })
 
 test("all four verified packages produce checksums and a source-bound manifest", (t) => {
