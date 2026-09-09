@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.17 |
+| 版本 | v0.18 |
 | 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
@@ -43,7 +43,7 @@
 | 领域 | 方案 | 状态 | 说明 |
 |---|---|---|---|
 | 桌面外壳 | Tauri 2 | 已采用 | 当前项目已初始化。 |
-| 前端 | React 19 + TypeScript strict | 已采用 | 当前项目已初始化。 |
+| 前端 | React 19 + TypeScript 6 strict | 已采用 | 业务与 Node 配置均使用显式 paths，不使用已弃用的 baseUrl；见 [依赖集成验收](iterations/0015-ci-dependency-integration.md)。 |
 | 构建 | Vite 7 | 已采用 | 当前项目已初始化。 |
 | 包管理 | pnpm 11.10.0 | 已采用 | 由 `packageManager` 固定版本。 |
 | 工具链 | Node.js 24.20.0 + Rust 1.98.1 | 已采用 | 由 `.node-version` 和 `rust-toolchain.toml` 固定。 |
@@ -661,3 +661,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.15 | 2026-09-09 | 移除备份与恢复架构方案，将数据迁移和自定义数据库位置明确为非目标，并保留内部 schema migration。 |
 | v0.16 | 2026-09-09 | 记录离线 IPC、编辑快照、路由分包与错误边界、依赖门禁和用例拆分；校正权限、虚拟化及严格分层的实现状态。 |
 | v0.17 | 2026-09-09 | 记录纯 Domain 与批量事务端口落地、仓库治理门禁、四处版本与隔离签名流程，保留普通 CRUD 过渡边界。 |
+| v0.18 | 2026-09-09 | 采用 TypeScript 6，移除两套配置的 baseUrl，保留显式别名和 strict，并记录受控依赖集成。 |
