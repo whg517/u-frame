@@ -108,7 +108,7 @@ pnpm gate
 确认：
 
 - 变更仅属于当前任务。
-- 没有密钥、数据库、日志、备份或构建产物。
+- 没有密钥、数据库、日志、导入文件或构建产物。
 - 文档和实现状态一致。
 - 所有门禁阶段成功结束。
 
@@ -134,7 +134,7 @@ chore(gate): add pre-commit quality checks
 规则：
 
 - `type` 使用 `feat`、`fix`、`docs`、`refactor`、`test`、`chore`。
-- `scope` 使用稳定业务域或工程域，例如 `rack`、`asset`、`placement`、`import`、`backup`、`gate`。
+- `scope` 使用稳定业务域或工程域，例如 `rack`、`asset`、`placement`、`import`、`audit`、`gate`。
 - summary 使用英文祈使语气，简洁描述结果。
 - 分支内允许多个便于评审的小提交；合并时统一 squash。
 
@@ -206,7 +206,7 @@ PR 描述至少包含：
 - 关键实现或设计选择。
 - 验证命令和结果。
 - UI 变更截图或录屏。
-- 数据迁移、兼容性和回滚影响。
+- 数据库 schema migration、兼容性和回滚影响。
 - 未完成项或已知限制。
 
 创建或更新 PR 前：

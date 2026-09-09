@@ -14,7 +14,7 @@ UFrame 是一个面向 macOS 的本地桌面机柜与物理设备资产管理工
 - 在设置中选择系统/浅色/深色外观、五种主题色、简体中文/英语、默认画布缩放、界面密度与字号以及默认启动页面，偏好在本机保存。
 - 数据保存在本机应用数据目录，不依赖远程服务。
 
-Excel 导入导出、备份恢复、完整审计和正式签名发行仍在后续里程碑中。已实现范围和非目标以 [PRD](docs/PRD.md) 为准。
+Excel 导入导出、完整审计和正式签名发行仍在后续里程碑中。产品不提供数据备份、迁移或恢复功能，业务数据库固定保存在应用数据目录。已实现范围和非目标以 [PRD](docs/PRD.md) 为准。
 
 ## 技术基线
 
@@ -65,7 +65,7 @@ pnpm tauri build --debug --bundles app
 - [GitHub 治理](docs/GITHUB_GOVERNANCE.md)
 - [发布规范](docs/RELEASING.md)
 - [变更记录](CHANGELOG.md)
-- [最新迭代验收记录](docs/iterations/0011-default-startup-page.md)
+- [最新迭代验收记录](docs/iterations/0012-data-lifecycle-scope.md)
 
 ## 许可证
 

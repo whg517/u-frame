@@ -50,7 +50,7 @@
 
 1. 建立发布 Issue，冻结范围、已知限制和验收负责人。
 2. 更新 `package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 为同一 SemVer；执行 `cargo check` 更新 `Cargo.lock` 中的包版本。
-3. 把“未发布”内容整理为版本条目，记录日期、用户可见变化、数据迁移和兼容性。
+3. 把“未发布”内容整理为版本条目，记录日期、用户可见变化、数据库 schema migration 和兼容性。
 4. 执行 `pnpm version:check` 和 `pnpm gate`，在真实 Tauri 窗口中完成发布范围验收。
 5. 通过 Pull Request squash 合并到 `main`，等待 `quality-gate` 成功。
 6. 在最新本地 `main` 创建 annotated tag，并仅推送该 tag：
@@ -90,10 +90,10 @@ Tag push 触发 [Release workflow](../.github/workflows/release.yml)：
 - DMG 可以挂载，应用可拖入 `/Applications`。
 - Gatekeeper 不显示未签名或来源损坏警告。
 - Intel 与 Apple Silicon 至少各完成一次安装启动；条件不足时不得宣称双架构已验收。
-- 空库首次启动、数据库迁移、应用重启和已实现的核心业务闭环通过。
+- 空库首次启动、数据库 schema migration、应用重启和已实现的核心业务闭环通过。
 - 深色和浅色模式、最小窗口尺寸、关键画布交互无阻断问题。
 - Release notes、版本号、已知限制、下载文件名和摘要正确。
-- 当 Excel、备份恢复或审计进入该版本范围后，必须增加相应真实文件和恢复验收。
+- 当 Excel 导入导出或审计进入该版本范围后，必须增加相应真实文件和操作记录验收。
 
 验收证据记录在发布 Issue。全部通过后由维护者发布 Draft Release；若仓库启用了 Immutable Releases，发布后不得替换 tag 或资产。
 
