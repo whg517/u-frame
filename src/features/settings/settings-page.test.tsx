@@ -37,6 +37,7 @@ describe("SettingsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "120%" }))
     fireEvent.click(screen.getByRole("button", { name: "紧凑密度" }))
     fireEvent.click(screen.getByRole("button", { name: "大字号" }))
+    fireEvent.click(screen.getByRole("button", { name: "设备资产" }))
     fireEvent.click(screen.getByRole("button", { name: "英语" }))
 
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument()
@@ -46,6 +47,7 @@ describe("SettingsPage", () => {
     expect(document.documentElement).toHaveAttribute("data-density", "compact")
     expect(document.documentElement).toHaveAttribute("data-font-size", "large")
     expect(document.documentElement).toHaveAttribute("lang", "en-US")
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument()
 
     await waitFor(() => {
       expect(JSON.parse(window.localStorage.getItem(preferencesStorageKey) ?? "{}")).toEqual({
@@ -55,6 +57,7 @@ describe("SettingsPage", () => {
         defaultCanvasZoom: 1.2,
         interfaceDensity: "compact",
         interfaceFontSize: "large",
+        defaultStartupPage: "assets",
       })
     })
   })
@@ -67,6 +70,7 @@ describe("SettingsPage", () => {
       defaultCanvasZoom: 1.4,
       interfaceDensity: "spacious",
       interfaceFontSize: "large",
+      defaultStartupPage: "racks",
     }))
     setActiveLanguage("en-US")
     render(<AppProvider><SettingsPage /></AppProvider>)
