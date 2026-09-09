@@ -5,6 +5,7 @@ export type AccentColor = "neutral" | "blue" | "green" | "orange" | "violet"
 export type DefaultCanvasZoom = 0.8 | 1 | 1.2 | 1.4
 export type InterfaceDensity = "compact" | "standard" | "spacious"
 export type InterfaceFontSize = "small" | "standard" | "large"
+export type DefaultStartupPage = "rackOverview" | "locations" | "racks" | "assets"
 
 export interface Preferences {
   themeMode: ThemeMode
@@ -13,6 +14,7 @@ export interface Preferences {
   defaultCanvasZoom: DefaultCanvasZoom
   interfaceDensity: InterfaceDensity
   interfaceFontSize: InterfaceFontSize
+  defaultStartupPage: DefaultStartupPage
 }
 
 export const preferencesStorageKey = "uframe.preferences.v1"
@@ -24,6 +26,7 @@ export const defaultPreferences: Preferences = {
   defaultCanvasZoom: 1,
   interfaceDensity: "standard",
   interfaceFontSize: "standard",
+  defaultStartupPage: "rackOverview",
 }
 
 const themeModes = new Set<ThemeMode>(["system", "light", "dark"])
@@ -32,6 +35,7 @@ const languages = new Set<AppLanguage>(["zh-CN", "en-US"])
 const defaultCanvasZooms = new Set<DefaultCanvasZoom>([0.8, 1, 1.2, 1.4])
 const interfaceDensities = new Set<InterfaceDensity>(["compact", "standard", "spacious"])
 const interfaceFontSizes = new Set<InterfaceFontSize>(["small", "standard", "large"])
+const defaultStartupPages = new Set<DefaultStartupPage>(["rackOverview", "locations", "racks", "assets"])
 
 export function readPreferences(storage: Pick<Storage, "getItem"> = window.localStorage): Preferences {
   try {
@@ -51,6 +55,9 @@ export function readPreferences(storage: Pick<Storage, "getItem"> = window.local
       interfaceFontSize: parsed.interfaceFontSize && interfaceFontSizes.has(parsed.interfaceFontSize)
         ? parsed.interfaceFontSize
         : defaultPreferences.interfaceFontSize,
+      defaultStartupPage: parsed.defaultStartupPage && defaultStartupPages.has(parsed.defaultStartupPage)
+        ? parsed.defaultStartupPage
+        : defaultPreferences.defaultStartupPage,
     }
   } catch {
     return defaultPreferences

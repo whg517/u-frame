@@ -1,4 +1,5 @@
 import { createBrowserRouter, RouterProvider } from "react-router"
+import { useState } from "react"
 
 import { AppLayout } from "./layout"
 import { AssetDetailPage } from "@/features/assets/asset-detail-page"
@@ -15,7 +16,7 @@ import { RackFormPage } from "@/features/racks/rack-form-page"
 import { RacksPage } from "@/features/racks/racks-page"
 import { SettingsPage } from "@/features/settings/settings-page"
 
-const router = createBrowserRouter([
+const routes = [
   {
     element: <AppLayout />,
     children: [
@@ -39,8 +40,9 @@ const router = createBrowserRouter([
       { path: "settings", element: <SettingsPage /> },
     ],
   },
-])
+] satisfies Parameters<typeof createBrowserRouter>[0]
 
 export function AppRouter() {
+  const [router] = useState(() => createBrowserRouter(routes))
   return <RouterProvider router={router} />
 }

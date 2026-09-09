@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Draft / Proposed |
-| 版本 | v1.0 |
+| 版本 | v1.1 |
 | 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame MVP |
 | 关联文档 | [产品需求文档](PRD.md) · [技术设计文档](TECHNICAL_DESIGN.md) |
@@ -78,7 +78,7 @@ MVP 是本机单用户工具，不设计登录和角色权限。以下角色只�
 | EPIC-PLC | 管理 U 位放置 | US-PLC-001、US-PLC-002、US-PLC-003、US-PLC-004、US-PLC-005 | P0–P1 |
 | EPIC-VIEW | 查看机柜一览 | US-VIEW-001、US-VIEW-002、US-VIEW-003、US-VIEW-004、US-VIEW-005 | P0–P1 |
 | EPIC-FLOW | 连续完成核心任务 | US-FLOW-001、US-FLOW-002、US-FLOW-003 | P0 |
-| EPIC-SET | 调整本地使用偏好 | US-SET-001、US-SET-002 | P1 |
+| EPIC-SET | 调整本地使用偏好 | US-SET-001–US-SET-005 | P1 |
 | EPIC-IMP | 交换资产数据 | US-IMP-001、US-IMP-002、US-IMP-003、US-IMP-004、US-EXP-001 | P0–P1 |
 | EPIC-OPS | 保护和追溯数据 | US-BAK-001、US-BAK-002、US-AUD-001 | P0–P1 |
 
@@ -734,6 +734,24 @@ MVP 是本机单用户工具，不设计登录和角色权限。以下角色只�
 - Given 已保存非默认界面尺寸，When 重启应用，Then 首屏渲染前恢复选择。
 - Given 旧版本偏好缺少字段、字段无效或执行恢复默认，Then 密度和字号分别安全回退为标准档且不影响业务数据。
 
+### US-SET-005 选择默认启动页面
+
+**作为** 有固定日常入口的本地管理员
+
+**我希望** 选择 UFrame 启动后首先显示的一级页面
+
+**以便** 每次打开应用时直接进入最常使用的工作区域
+
+**来源需求**：SET-004、SET-005、SET-008
+
+**验收标准**：
+
+- Given 设置页，When 选择机柜一览、位置管理、机柜管理或设备资产，Then 偏好立即保存但当前页面不跳转，并明确提示下次启动生效。
+- Given 默认启动页为设备资产，When 应用从无参数根地址启动，Then 首屏直接显示设备资产且不先渲染机柜一览。
+- Given 默认启动页不是机柜一览，When 用户启动后再点击侧栏“机柜一览”，Then 正常进入根路径画布，不再次重定向。
+- Given 应用通过详情深链、列表路径或带筛选参数的根地址打开，Then 保留请求地址，不应用启动页重定向。
+- Given 旧偏好缺失、值无效或执行恢复默认，Then 默认启动页回退为机柜一览且不影响业务数据。
+
 ## 13. 迭代切片建议
 
 ### Slice 1：最小可用闭环
@@ -790,7 +808,9 @@ Iteration 008 交付 US-SET-001 和 US-SET-002：增加系统/浅色/深色外�
 
 Iteration 009 交付 US-SET-003：增加 80%、100%、120% 和 140% 默认画布缩放，进入机柜一览及缩放重置均使用所选默认值。验证记录见 [Iteration 009](iterations/0009-default-canvas-zoom.md)。
 
-Iteration 010 交付 US-SET-004：增加三档界面密度和三档界面字号，通过根节点 token 一致作用于全应用，且不改变机柜 U 位几何。默认启动页面和备份位置仍待后续评估。验证记录见 [Iteration 010](iterations/0010-interface-scale.md)。
+Iteration 010 交付 US-SET-004：增加三档界面密度和三档界面字号，通过根节点 token 一致作用于全应用，且不改变机柜 U 位几何。验证记录见 [Iteration 010](iterations/0010-interface-scale.md)。
+
+Iteration 011 交付 US-SET-005：增加四个一级页面作为默认启动入口，在首屏路由创建前解析偏好，同时保留详情深链和筛选上下文。数据存储与备份位置仍待与备份恢复能力统一设计。验证记录见 [Iteration 011](iterations/0011-default-startup-page.md)。
 
 ## 14. 需求追踪矩阵
 
@@ -831,6 +851,7 @@ Iteration 010 交付 US-SET-004：增加三档界面密度和三档界面字号�
 | SET-003–SET-005 | US-SET-002 |
 | SET-004–SET-006 | US-SET-003 |
 | SET-004–SET-005、SET-007 | US-SET-004 |
+| SET-004–SET-005、SET-008 | US-SET-005 |
 
 ## 15. Definition of Ready
 
@@ -869,3 +890,4 @@ Iteration 010 交付 US-SET-004：增加三档界面密度和三档界面字号�
 | v0.8 | 2026-09-08 | 增加应用外观与全局语言用户故事，并记录 Iteration 008 交付范围。 |
 | v0.9 | 2026-09-08 | 增加默认机柜画布缩放用户故事，并记录 Iteration 009 交付范围。 |
 | v1.0 | 2026-09-09 | 增加界面密度和字号用户故事，并记录 Iteration 010 交付范围。 |
+| v1.1 | 2026-09-09 | 增加默认启动页面用户故事，并记录 Iteration 011 交付范围。 |

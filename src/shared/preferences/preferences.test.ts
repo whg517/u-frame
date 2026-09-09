@@ -19,6 +19,7 @@ describe("preferences", () => {
             defaultCanvasZoom: 1.4,
             interfaceDensity: "compact",
             interfaceFontSize: "large",
+            defaultStartupPage: "assets",
           })
         : null,
     }
@@ -30,6 +31,7 @@ describe("preferences", () => {
       defaultCanvasZoom: 1.4,
       interfaceDensity: "compact",
       interfaceFontSize: "large",
+      defaultStartupPage: "assets",
     })
   })
 
@@ -59,6 +61,13 @@ describe("preferences", () => {
     })
   })
 
+  it("defaults legacy and unsupported startup pages to the rack overview", () => {
+    expect(readPreferences({ getItem: () => JSON.stringify({}) }).defaultStartupPage).toBe("rackOverview")
+    expect(readPreferences({
+      getItem: () => JSON.stringify({ defaultStartupPage: "settings" }),
+    }).defaultStartupPage).toBe("rackOverview")
+  })
+
   it("resolves system mode and applies document attributes", () => {
     const root = document.createElement("html")
     applyPreferences({
@@ -68,6 +77,7 @@ describe("preferences", () => {
       defaultCanvasZoom: 1.2,
       interfaceDensity: "compact",
       interfaceFontSize: "large",
+      defaultStartupPage: "locations",
     }, true, root)
 
     expect(isDarkMode("system", true)).toBe(true)

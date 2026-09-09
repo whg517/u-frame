@@ -1,4 +1,4 @@
-import { Check, Languages, Paintbrush, RotateCcw, ScanSearch, SlidersHorizontal, SunMoon, Type } from "lucide-react"
+import { Check, Home, Languages, Paintbrush, RotateCcw, ScanSearch, SlidersHorizontal, SunMoon, Type } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,6 +8,7 @@ import { usePreferences } from "@/shared/preferences/preferences-provider"
 import type {
   AccentColor,
   DefaultCanvasZoom,
+  DefaultStartupPage,
   InterfaceDensity,
   InterfaceFontSize,
   ThemeMode,
@@ -49,6 +50,16 @@ const fontSizeOptions: Array<{
   { value: "small", label: "小字号" },
   { value: "standard", label: "标准字号" },
   { value: "large", label: "大字号" },
+]
+
+const startupPageOptions: Array<{
+  value: DefaultStartupPage
+  label: "机柜一览" | "位置管理" | "机柜管理" | "设备资产"
+}> = [
+  { value: "rackOverview", label: "机柜一览" },
+  { value: "locations", label: "位置管理" },
+  { value: "racks", label: "机柜管理" },
+  { value: "assets", label: "设备资产" },
 ]
 
 export function SettingsPage() {
@@ -160,6 +171,29 @@ export function SettingsPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Home className="size-4" /> {t("启动")}</CardTitle>
+              <CardDescription>{t("选择 UFrame 启动后首先打开的页面，下次启动生效。")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <fieldset className="grid gap-3">
+                <legend className="sr-only">{t("默认启动页面")}</legend>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {startupPageOptions.map((option) => (
+                    <PreferenceButton
+                      key={option.value}
+                      selected={preferences.defaultStartupPage === option.value}
+                      onClick={() => updatePreferences({ defaultStartupPage: option.value })}
+                    >
+                      {t(option.label)}
+                    </PreferenceButton>
+                  ))}
+                </div>
+              </fieldset>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="flex items-center gap-2"><ScanSearch className="size-4" /> {t("机柜画布")}</CardTitle>
               <CardDescription>{t("选择打开机柜一览时使用的默认缩放比例。")}</CardDescription>
             </CardHeader>
@@ -184,7 +218,7 @@ export function SettingsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-5 py-4">
             <div>
               <p className="text-sm font-medium">{t("当前设置会自动保存，不需要单独确认。")}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{t("默认使用系统外观、中性灰主题色、简体中文、标准界面尺寸和 100% 画布缩放。")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("默认使用机柜一览启动页、系统外观、中性灰主题色、简体中文、标准界面尺寸和 100% 画布缩放。")}</p>
             </div>
             <Button variant="outline" onClick={resetPreferences}><RotateCcw /> {t("恢复默认设置")}</Button>
           </div>
