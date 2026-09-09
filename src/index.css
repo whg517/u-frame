@@ -83,6 +83,30 @@
     --sidebar-ring: oklch(0.708 0 0);
 }
 
+:root[data-density="compact"] {
+    --spacing: 0.225rem;
+}
+
+:root[data-density="standard"] {
+    --spacing: 0.25rem;
+}
+
+:root[data-density="spacious"] {
+    --spacing: 0.275rem;
+}
+
+:root[data-font-size="small"] {
+    font-size: 14px;
+}
+
+:root[data-font-size="standard"] {
+    font-size: 16px;
+}
+
+:root[data-font-size="large"] {
+    font-size: 18px;
+}
+
 .dark {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);

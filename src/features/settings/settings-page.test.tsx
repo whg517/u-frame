@@ -15,6 +15,8 @@ describe("SettingsPage", () => {
     document.documentElement.className = ""
     document.documentElement.removeAttribute("data-theme-mode")
     document.documentElement.removeAttribute("data-accent")
+    document.documentElement.removeAttribute("data-density")
+    document.documentElement.removeAttribute("data-font-size")
   })
 
   it("applies and persists appearance and language preferences immediately", async () => {
@@ -33,12 +35,16 @@ describe("SettingsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "深色" }))
     fireEvent.click(screen.getByRole("button", { name: "蓝色" }))
     fireEvent.click(screen.getByRole("button", { name: "120%" }))
+    fireEvent.click(screen.getByRole("button", { name: "紧凑密度" }))
+    fireEvent.click(screen.getByRole("button", { name: "大字号" }))
     fireEvent.click(screen.getByRole("button", { name: "英语" }))
 
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Assets" })).toBeInTheDocument()
     expect(document.documentElement).toHaveClass("dark")
     expect(document.documentElement).toHaveAttribute("data-accent", "blue")
+    expect(document.documentElement).toHaveAttribute("data-density", "compact")
+    expect(document.documentElement).toHaveAttribute("data-font-size", "large")
     expect(document.documentElement).toHaveAttribute("lang", "en-US")
 
     await waitFor(() => {
@@ -47,6 +53,8 @@ describe("SettingsPage", () => {
         accentColor: "blue",
         language: "en-US",
         defaultCanvasZoom: 1.2,
+        interfaceDensity: "compact",
+        interfaceFontSize: "large",
       })
     })
   })
@@ -57,6 +65,8 @@ describe("SettingsPage", () => {
       accentColor: "violet",
       language: "en-US",
       defaultCanvasZoom: 1.4,
+      interfaceDensity: "spacious",
+      interfaceFontSize: "large",
     }))
     setActiveLanguage("en-US")
     render(<AppProvider><SettingsPage /></AppProvider>)
