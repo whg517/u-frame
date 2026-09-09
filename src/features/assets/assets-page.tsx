@@ -13,8 +13,8 @@ import { t } from "@/shared/i18n/i18n"
 import { assetStatusLabel, assetTypeLabel } from "@/shared/lib/asset-labels"
 import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
-import { useRacks } from "@/features/racks/queries"
-import { useAssets } from "./queries"
+import { useRacks } from "@/shared/queries/racks"
+import { useAssets } from "@/shared/queries/assets"
 
 export function AssetsPage() {
   const assets = useAssets()

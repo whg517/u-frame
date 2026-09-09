@@ -37,9 +37,9 @@ const interfaceDensities = new Set<InterfaceDensity>(["compact", "standard", "sp
 const interfaceFontSizes = new Set<InterfaceFontSize>(["small", "standard", "large"])
 const defaultStartupPages = new Set<DefaultStartupPage>(["rackOverview", "locations", "racks", "assets"])
 
-export function readPreferences(storage: Pick<Storage, "getItem"> = window.localStorage): Preferences {
+export function readPreferences(storage?: Pick<Storage, "getItem">): Preferences {
   try {
-    const value = storage.getItem(preferencesStorageKey)
+    const value = (storage ?? window.localStorage).getItem(preferencesStorageKey)
     if (!value) return defaultPreferences
     const parsed = JSON.parse(value) as Partial<Preferences>
     return {
@@ -66,10 +66,10 @@ export function readPreferences(storage: Pick<Storage, "getItem"> = window.local
 
 export function writePreferences(
   preferences: Preferences,
-  storage: Pick<Storage, "setItem"> = window.localStorage,
+  storage?: Pick<Storage, "setItem">,
 ) {
   try {
-    storage.setItem(preferencesStorageKey, JSON.stringify(preferences))
+    (storage ?? window.localStorage).setItem(preferencesStorageKey, JSON.stringify(preferences))
   } catch {
     // Preference persistence must never prevent the local application from opening.
   }

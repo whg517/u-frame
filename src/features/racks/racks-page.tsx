@@ -9,7 +9,7 @@ import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
-import { useRacks } from "./queries"
+import { useRacks } from "@/shared/queries/racks"
 
 export function RacksPage() {
   const racks = useRacks()

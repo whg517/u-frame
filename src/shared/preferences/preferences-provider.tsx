@@ -19,12 +19,12 @@ const PreferencesContext = createContext<PreferencesContextValue | null>(null)
 
 export function PreferencesProvider({
   children,
-  initialPreferences = readPreferences(),
+  initialPreferences,
 }: {
   children: ReactNode
   initialPreferences?: Preferences
 }) {
-  const [preferences, setPreferences] = useState(initialPreferences)
+  const [preferences, setPreferences] = useState(() => initialPreferences ?? readPreferences())
   const [systemIsDark, setSystemIsDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   )

@@ -13,7 +13,7 @@ import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
-import { useLocations } from "./queries"
+import { useLocations } from "@/shared/queries/locations"
 
 function BackToLocations({ to = "/locations", label = t("返回") }: { to?: string; label?: string }) {
   return (

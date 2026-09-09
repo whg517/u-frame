@@ -24,7 +24,7 @@ import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
-import { useAssets } from "./queries"
+import { useAssets } from "@/shared/queries/assets"
 
 export function AssetDetailPage() {
   const { assetId = "" } = useParams()

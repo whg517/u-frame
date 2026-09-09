@@ -137,9 +137,12 @@ app → features → shared
 
 - `app` 只负责路由、Provider 和跨 feature 装配。
 - feature 之间不得直接相互导入；跨 feature 组合放在 `app`。
+- 多个 feature 共用的实体查询位于 `shared/queries`；ESLint 检查别名、相对路径和动态导入的依赖方向。
 - `shared` 不得导入 `features` 或 `app`。
 - 组件不得直接调用裸 `invoke`；Tauri 调用集中在 typed client 和 feature API 层。
 - 后端返回的业务数据只作为查询缓存，不得复制到全局 store 形成第二份真相。
+- 本地 IPC 查询和写操作必须使用 `networkMode: "always"`，不能依赖浏览器联网状态。
+- 编辑表单按实体 ID 初始化一次；后台重新查询不得覆盖未保存输入，创建页的上下文预选不得覆盖用户主动选择。
 - TypeScript 保持 `strict`，不得通过关闭严格检查解决类型错误。
 - 避免无业务价值的 barrel 文件，优先显式路径导入。
 
@@ -150,12 +153,13 @@ app → features → shared
 ```text
 Tauri Command
   → Application Service
-    → Domain
-      → Repository / Adapter
+    → Domain（纯规则）
+    → Repository / Adapter（持久化）
 ```
 
 - Command 只负责 DTO、入口校验、调用应用服务和错误映射。
 - Application Service 负责用例、事务和审计编排。
+- 当前应用用例按位置、机柜、资产、放置和画布查询拆分；SQL 仍部分位于应用层，仓储提取属于后续重构，不得宣称已完成严格分层。
 - Domain 规则必须是可单元测试的纯 Rust 逻辑，不依赖 Tauri、SQL 或文件系统。
 - Repository/Adapter 负责 SQLite、Excel、CSV 和必要的系统路径。
 - 前端不得直接访问 SQLite、任意文件或本地命令。

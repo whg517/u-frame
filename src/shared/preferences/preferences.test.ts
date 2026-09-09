@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import {
   applyPreferences,
@@ -6,9 +6,22 @@ import {
   isDarkMode,
   preferencesStorageKey,
   readPreferences,
+  writePreferences,
 } from "./preferences"
 
 describe("preferences", () => {
+  it("survives a denied localStorage getter before reading or writing", () => {
+    const getter = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("Storage access denied", "SecurityError")
+    })
+    try {
+      expect(readPreferences()).toEqual(defaultPreferences)
+      expect(() => writePreferences(defaultPreferences)).not.toThrow()
+    } finally {
+      getter.mockRestore()
+    }
+  })
+
   it("loads valid values and falls back field by field", () => {
     const storage = {
       getItem: (key: string) => key === preferencesStorageKey

@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.15 |
+| 版本 | v0.16 |
 | 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
@@ -73,7 +73,7 @@
                        ▼
 ┌─────────────────────────────────────────────────────────┐
 │ Rust Core                                               │
-│ Commands → Application Services → Domain → Repositories │
+│ Commands → Application → Domain / Repositories          │
 │ 输入校验 / 用例编排 / U 位规则 / 事务 / 错误映射        │
 └───────────────┬───────────────────┬─────────────────────┘
                 │                   │
@@ -89,7 +89,7 @@
 | 层 | 职责 | 禁止事项 |
 |---|---|---|
 | React UI | 展示、交互、即时校验、调用 feature API | 直接执行 SQL、直接访问任意文件、复制长期业务状态 |
-| Feature API | 封装 Tauri `invoke`、查询键、缓存失效和 DTO 转换 | 在组件中散落命令字符串 |
+| Shared Query / Typed Client | 共享实体查询、类型化 IPC 和查询键；feature 编排写后缓存失效 | 在组件中散落命令字符串 |
 | Tauri Commands | IPC 入口、反序列化、调用应用服务、映射返回值 | 编写 SQL或承载领域规则 |
 | Application Services | 编排用例、事务、仓储和审计记录 | 依赖 UI 类型或组件状态 |
 | Domain | 设备类型、U 位范围、冲突、状态迁移等纯业务规则 | 文件系统、数据库或 Tauri 依赖 |
@@ -100,6 +100,7 @@
 - SQLite 是业务实体、当前放置关系和历史记录的唯一权威数据源。
 - 机柜画布根据 `racks + assets + rack_placements` 派生，不保存第二份画布坐标。
 - TanStack Query 只缓存 Rust 后端返回的数据；不得复制到全局 store 长期维护。
+- 本地 IPC 的 queries 和 mutations 均使用 `networkMode: "always"`；离线时不等待网络恢复，写操作不自动重试。
 - Excel 是导入来源，不是运行时数据库，也不与正式数据自动双向同步。
 
 ## 5. 前端设计
@@ -131,10 +132,12 @@ src/
 依赖方向固定为 `app → features → shared`：
 
 - `app` 只负责路由、Provider 和跨 feature 装配。
-- 每个 feature 包含自己的页面、组件、表单、查询定义和映射逻辑。
+- 每个 feature 包含自己的页面、组件、表单和用例逻辑；被多个 feature 使用的位置、机柜、资产查询放在 `shared/queries`。
 - feature 之间不得直接相互导入；跨领域页面由 `app` 组合。
 - `shared` 不得反向依赖 `features` 或 `app`。
 - 禁止聚合式 barrel 文件隐藏真实依赖，优先显式路径导入。
+- `scripts/eslint-boundaries.mjs` 在门禁中检查生产代码的别名、相对路径、再导出和动态导入边界；跨领域集成测试放在 `testing`。
+- 路由在 `app/routes.tsx` 按页面延迟加载，首屏提供加载状态；页面错误由保留固定侧栏的路由边界处理，未知路径提供返回入口，不展示内部异常。
 
 ### 5.2 Tauri 客户端封装
 
@@ -142,7 +145,7 @@ src/
 
 ```text
 页面组件
-  → feature query / mutation
+  → shared query / feature mutation
     → typed Tauri client
       → invoke(command, payload)
 ```
@@ -153,7 +156,7 @@ src/
 - 请求和响应都使用明确 DTO，不返回无约束 JSON。
 - Rust 字段统一序列化为 camelCase。
 - mutation 成功后只失效相关查询，不执行全局刷新。
-- Rust 错误统一转换为前端 `AppError`，UI 按错误码映射中文文案。
+- Rust 错误统一转换为前端 `CommandError`，UI 按稳定错误码映射当前语言文案；未知业务错误保留 `operationId`，普通异常只显示通用提示。
 
 ### 5.3 状态划分
 
@@ -184,7 +187,7 @@ src/
 - 画布背景使用两层 CSS 线性渐变绘制低对比度方格，网格尺寸与当前缩放比例同步。
 - 缩放范围固定为 50%–160%，当前缩放由页面本地状态管理；页面从本机偏好中的默认缩放初始化，缩放重置回到该默认值，均不写入数据库。
 - 设备块位置由 `startU` 和 `heightU` 计算，不保存像素坐标。
-- 多机柜采用横向或二维虚拟化；只渲染可视区域和少量缓冲区。
+- 当前多机柜使用横向 DOM 布局；可视区域虚拟化尚未实现，需在性能基准验证后单独交付。
 - 普通模式下选中设备打开详情侧栏；已上架设备可在画布中拖动，首次拖动自动进入布局编辑模式。
 - 布局编辑模式使用 React 页面本地草稿投影，按设备 ID 记录目标机柜和 `startU`；取消直接丢弃草稿，不执行 IPC。
 - 拖动过程根据指针位置、当前缩放和抓取偏移计算目标 U 位，并针对草稿投影实时检查越界与重叠。
@@ -201,12 +204,15 @@ src/
 - 机柜和设备列表行是主导航目标，支持指针点击和键盘 Enter；行内按钮要停止事件传播。
 - 上架和移动页从 `get_rack_view` 投影派生能容纳设备高度的连续空闲范围，不建立第二份占用状态。
 - 前端在输入时显示最终范围和冲突设备；Rust 应用层和 SQLite 事务边界重新执行边界、重叠和唯一活动放置校验。
+- 四类编辑表单以实体 ID 为初始化边界，仅回填一次。后台刷新更新查询缓存但不重置当前草稿；切换实体重新初始化。创建页的父级预选不得覆盖用户主动修改的选择。
+- IP 输入使用 Zod 的 IPv4/IPv6 校验器，Rust 继续独立校验；不使用只检查字符集合的正则表达式代替地址语义校验。
 - 画布批量保存提交设备的最终机柜和 `startU`；Rust 在单一事务中读取全部活动放置，先验证完整最终布局，再结束旧放置并创建新放置，因此支持多设备联动调整且任一失败整体回滚。
 
 ### 5.7 本地偏好与界面国际化
 
 - 外观、主题色、语言、默认画布缩放、界面密度、字号和默认启动页面是设备本地 UI 偏好，不属于机房资产业务数据，不写入 SQLite，也不新增 Tauri Command。
 - 偏好使用带版本的 `uframe.preferences.v1` 键保存到 WebView `localStorage`；读取时逐字段校验，缺失、未知值或损坏 JSON 回退到默认值。
+- 获取 `window.localStorage` 本身也在异常保护内；浏览器拒绝存储访问时使用内存偏好，不能阻止页面打开。Provider 惰性读取初始值，不在每次渲染时访问存储。
 - 应用入口在 React 首次渲染前恢复偏好，设置根节点的 `dark` class、`data-theme-mode`、`data-accent`、`lang` 和 `color-scheme`，避免首屏出现明显闪烁。
 - `PreferencesProvider` 负责即时更新、持久化和监听 `prefers-color-scheme`；跟随系统模式仅响应系统明暗变化，不改变已保存选项。
 - 主题色通过语义 CSS token 覆盖实现，业务组件只使用 `primary`、`ring` 和 `sidebar-primary` 等语义色，不直接依赖具体色值。
@@ -474,8 +480,8 @@ React WebView 输入、Excel 内容和用户选择的路径均视为不可信。
 
 - Capability 仅绑定 `main` 窗口和 macOS。
 - 只启用实际需要的 dialog、文件读取或保存权限，并限制路径范围。
-- 当前脚手架启用了 `opener:default`，业务不需要时应在 M1 前移除。
-- 当前 `csp` 为 `null`，M1 前必须设置仅允许本地资源的 CSP。
+- 当前仅启用 `core:default`，默认 opener 权限已移除；未使用的 dialog 和文件权限不提前开放。
+- 生产 CSP 已限制为本地资源与 Tauri IPC；开发 CSP 额外允许本地 Vite HTTP/WebSocket。具体配置以 `src-tauri/tauri.conf.json` 为准。
 - 不加载远程页面，不向远程 origin 暴露本地 Command。
 
 ### 9.3 数据保护
@@ -493,6 +499,8 @@ React WebView 输入、Excel 内容和用户选择的路径均视为不可信。
 | 100 台机柜画布 | 可视区域虚拟化、轻量网格背景、设备块按范围渲染 |
 | 导入 10,000 行 | Rust 后台解析、批量校验、事务批量写入、按需报告进度 |
 | 审计记录增长 | 按时间和实体建立索引，列表游标或分页查询 |
+
+上表包含目标措施，不代表全部落地：虚拟化、导入与审计仍待实现。2026-09-09 路由分包后的入口 JS 为约 511 KB（此前约 729 KB），是产物体积结果，不代表启动时间或大数据性能已验收。
 
 禁止在 React 渲染过程中重复执行全量占用计算。Rust 返回标准化放置数据，前端使用纯函数按机柜建立索引，并只在输入数据变化时重新计算。
 
@@ -608,6 +616,9 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 - 归档、审计和历史查询尚未实现；单设备移动、下架与画布批量调整事务已交付。
 - 可视区域虚拟化及 100 台机柜性能验证尚未实现。
 - Excel 导入导出适配器尚未实现。
+- 应用层已按用例拆分文件并保留原事务边界，但 SQL 尚未完全提取为仓储；Domain 仍引用 DTO/错误类型，严格领域隔离尚未完成。
+- 未保存修改的跨页离开保护、数据库初始化失败的可操作界面仍需单独交付。
+- 本轮设计与代码评审、风险排序和验证记录见 [Iteration 013](iterations/0013-design-and-code-review.md)。
 - GitHub CI 和发布 workflow 已建立；Apple 签名凭据、首个 Draft Release 及 Intel/Apple Silicon 安装验收尚未执行。
 
 ## 17. 参考资料
@@ -621,6 +632,9 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 - [Tauri：GitHub Actions 发布](https://v2.tauri.app/distribute/pipelines/github/)
 - [GitHub Actions 安全加固](https://docs.github.com/en/code-security/tutorials/secure-your-organization/protect-against-threats)
 - [GitHub Immutable Releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
+- [TanStack Query：本地操作的 Network Mode](https://tanstack.com/query/latest/docs/framework/react/guides/network-mode)
+- [React Router：错误边界](https://reactrouter.com/how-to/error-boundary)
+- [SQLx：SQLite 文件路径配置](https://docs.rs/sqlx/latest/sqlx/sqlite/struct.SqliteConnectOptions.html)
 
 ## 18. 变更记录
 
@@ -641,3 +655,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.13 | 2026-09-09 | 增加根节点界面密度与字号 token、默认值、旧偏好兼容和机柜几何隔离约束。 |
 | v0.14 | 2026-09-09 | 增加默认启动页面偏好、首屏前根路径替换、深链保护和延迟路由创建方案。 |
 | v0.15 | 2026-09-09 | 移除备份与恢复架构方案，将数据迁移和自定义数据库位置明确为非目标，并保留内部 schema migration。 |
+| v0.16 | 2026-09-09 | 记录离线 IPC、编辑快照、路由分包与错误边界、依赖门禁和用例拆分；校正权限、虚拟化及严格分层的实现状态。 |

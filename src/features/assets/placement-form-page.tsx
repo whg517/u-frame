@@ -18,8 +18,8 @@ import { errorMessage } from "@/shared/lib/errors"
 import { routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
-import { useRacks } from "@/features/racks/queries"
-import { useAssets } from "./queries"
+import { useRacks } from "@/shared/queries/racks"
+import { useAssets } from "@/shared/queries/assets"
 import { availableRanges, conflictingPlacement } from "./placement-options"
 
 const createSchema = () => z.object({

@@ -18,9 +18,10 @@ import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
-import { useLocations } from "@/features/locations/queries"
+import { useLocations } from "@/shared/queries/locations"
 import { queryKeys } from "@/shared/lib/query-keys"
-import { useRacks } from "./queries"
+import { useRacks } from "@/shared/queries/racks"
+import { useEntityForm } from "@/shared/forms/use-entity-form"
 
 const rackSizes = [18, 22, 27, 32, 37, 42, 45, 47]
 const createSchema = () => z.object({
@@ -52,20 +53,18 @@ export function RackFormPage() {
   const returnTo = safeReturnTo(searchParams.get("returnTo"), rackId ? `/racks/${rackId}` : "/racks")
   const origin = currentRoute(location.pathname, location.search)
   const specification = useWatch({ control: form.control, name: "specification" })
-  useEffect(() => {
-    if (!rack) return
-    form.reset({
-      areaId: rack.areaId,
-      code: rack.code,
-      specification: rack.specification,
-      totalU: rack.totalU,
-      powerCapacityW: rack.powerCapacityW ?? undefined,
-      notes: rack.notes ?? "",
-    })
-  }, [form, rack])
+  useEntityForm(form, rackId, rack ? {
+    areaId: rack.areaId,
+    code: rack.code,
+    specification: rack.specification,
+    totalU: rack.totalU,
+    powerCapacityW: rack.powerCapacityW ?? undefined,
+    notes: rack.notes ?? "",
+  } : undefined)
   useEffect(() => {
     if (
       isEditing
+      || form.getFieldState("areaId").isDirty
       || !requestedAreaId
       || !locations.data?.rooms.some(({ areas }) => areas.some((area) => area.id === requestedAreaId))
     ) return
