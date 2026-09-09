@@ -13,7 +13,7 @@ import type { AssetPlacementMoveInput } from "@/shared/lib/tauri-client/bindings
 import { tauriClient } from "@/shared/lib/tauri-client/client"
 import { currentRoute, routeWithParams } from "@/shared/lib/navigation-context"
 import { usePreferences } from "@/shared/preferences/preferences-provider"
-import { useLocations } from "@/features/locations/queries"
+import { useLocations } from "@/shared/queries/locations"
 import { DeviceInspector } from "./device-inspector"
 import { CanvasZoomControls } from "./canvas-zoom-controls"
 import { CANVAS_ZOOM_STEP, clampCanvasZoom } from "./layout"

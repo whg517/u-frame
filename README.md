@@ -65,7 +65,7 @@ pnpm tauri build --debug --bundles app
 - [GitHub 治理](docs/GITHUB_GOVERNANCE.md)
 - [发布规范](docs/RELEASING.md)
 - [变更记录](CHANGELOG.md)
-- [最新迭代验收记录](docs/iterations/0012-data-lifecycle-scope.md)
+- [最新设计评审与迭代验收记录](docs/iterations/0013-design-and-code-review.md)
 
 ## 许可证
 

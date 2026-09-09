@@ -7,7 +7,7 @@ import { EmptyState } from "@/shared/components/empty-state"
 import { PageBody, PageHeader } from "@/shared/components/page"
 import { t } from "@/shared/i18n/i18n"
 import { errorMessage } from "@/shared/lib/errors"
-import { useLocations } from "./queries"
+import { useLocations } from "@/shared/queries/locations"
 
 export function LocationsPage() {
   const locations = useLocations()

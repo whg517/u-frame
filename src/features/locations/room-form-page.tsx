@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
-import { useEffect, useMemo } from "react"
+import { useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
@@ -18,7 +18,8 @@ import { errorMessage } from "@/shared/lib/errors"
 import { routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
-import { useLocations } from "./queries"
+import { useLocations } from "@/shared/queries/locations"
+import { useEntityForm } from "@/shared/forms/use-entity-form"
 
 const createSchema = () => z.object({
   code: z.string().trim().min(1, t("请输入机房编码")),
@@ -41,14 +42,11 @@ export function RoomFormPage() {
     resolver: zodResolver(schema),
     defaultValues: { code: "", name: "", description: "" },
   })
-  useEffect(() => {
-    if (!room) return
-    form.reset({
-      code: room.code,
-      name: room.name,
-      description: room.description ?? "",
-    })
-  }, [form, room])
+  useEntityForm(form, roomId, room ? {
+    code: room.code,
+    name: room.name,
+    description: room.description ?? "",
+  } : undefined)
   const save = useMutation({
     mutationFn: (values: FormData) => {
       const input = { ...values, description: values.description || null }

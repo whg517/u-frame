@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft } from "lucide-react"
-import { useEffect, useMemo } from "react"
+import { useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { z } from "zod"
@@ -19,13 +19,14 @@ import { errorMessage } from "@/shared/lib/errors"
 import { routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
-import { useAssets } from "./queries"
+import { useAssets } from "@/shared/queries/assets"
+import { useEntityForm } from "@/shared/forms/use-entity-form"
 
 const createSchema = () => {
-  const optionalIp = z.string().refine((value) => {
-    if (!value.trim()) return true
-    return /^((\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F:]+)$/.test(value.trim())
-  }, t("请输入有效的 IP 地址"))
+  const optionalIp = z.string().trim().refine(
+    (value) => !value || z.ipv4().safeParse(value).success || z.ipv6().safeParse(value).success,
+    t("请输入有效的 IP 地址"),
+  )
   return z.object({
     type: z.enum(["server", "switch", "router", "firewall"]),
     name: z.string().trim().min(1, t("请输入设备名称")),
@@ -64,23 +65,20 @@ export function AssetFormPage() {
       status: "active", notes: "",
     },
   })
-  useEffect(() => {
-    if (!asset) return
-    form.reset({
-      type: asset.type as FormData["type"],
-      name: asset.name,
-      hostname: asset.hostname ?? "",
-      intranetIp: asset.intranetIp ?? "",
-      managementIp: asset.managementIp ?? "",
-      serialNumber: asset.serialNumber ?? "",
-      vendor: asset.vendor ?? "",
-      model: asset.model ?? "",
-      purpose: asset.purpose ?? "",
-      heightU: asset.heightU,
-      status: asset.status as FormData["status"],
-      notes: asset.notes ?? "",
-    })
-  }, [asset, form])
+  useEntityForm(form, assetId, asset ? {
+    type: asset.type as FormData["type"],
+    name: asset.name,
+    hostname: asset.hostname ?? "",
+    intranetIp: asset.intranetIp ?? "",
+    managementIp: asset.managementIp ?? "",
+    serialNumber: asset.serialNumber ?? "",
+    vendor: asset.vendor ?? "",
+    model: asset.model ?? "",
+    purpose: asset.purpose ?? "",
+    heightU: asset.heightU,
+    status: asset.status as FormData["status"],
+    notes: asset.notes ?? "",
+  } : undefined)
   const save = useMutation({
     mutationFn: (value: FormData) => {
       const input = {

@@ -19,7 +19,8 @@ import { errorMessage } from "@/shared/lib/errors"
 import { currentRoute, routeWithParams, safeReturnTo } from "@/shared/lib/navigation-context"
 import { queryKeys } from "@/shared/lib/query-keys"
 import { tauriClient } from "@/shared/lib/tauri-client/client"
-import { useLocations } from "./queries"
+import { useLocations } from "@/shared/queries/locations"
+import { useEntityForm } from "@/shared/forms/use-entity-form"
 
 const createSchema = () => z.object({
   roomId: z.string().min(1, t("请选择所属机房")),
@@ -51,18 +52,16 @@ export function AreaFormPage() {
       .find(({ area }) => area.id === areaId),
     [areaId, locations.data],
   )
-  useEffect(() => {
-    if (!existing) return
-    form.reset({
-      roomId: existing.area.roomId,
-      code: existing.area.code,
-      name: existing.area.name,
-      description: existing.area.description ?? "",
-    })
-  }, [existing, form])
+  useEntityForm(form, areaId, existing ? {
+    roomId: existing.area.roomId,
+    code: existing.area.code,
+    name: existing.area.name,
+    description: existing.area.description ?? "",
+  } : undefined)
   useEffect(() => {
     if (
       isEditing
+      || form.getFieldState("roomId").isDirty
       || !requestedRoomId
       || !locations.data?.rooms.some(({ room }) => room.id === requestedRoomId)
     ) return

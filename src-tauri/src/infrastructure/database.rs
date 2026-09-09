@@ -1,4 +1,7 @@
-use std::{path::Path, str::FromStr, time::Duration};
+use std::{path::Path, time::Duration};
+
+#[cfg(test)]
+use std::str::FromStr;
 
 use sqlx::{
     SqlitePool,
@@ -8,7 +11,8 @@ use sqlx::{
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 pub async fn connect(path: &Path) -> Result<SqlitePool, sqlx::Error> {
-    let options = SqliteConnectOptions::from_str(&format!("sqlite://{}", path.display()))?
+    let options = SqliteConnectOptions::new()
+        .filename(path)
         .create_if_missing(true)
         .foreign_keys(true)
         .journal_mode(SqliteJournalMode::Wal)
@@ -38,7 +42,29 @@ pub async fn connect_test() -> Result<SqlitePool, sqlx::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::connect_test;
+    use super::{connect, connect_test};
+
+    #[tokio::test]
+    async fn opens_literal_paths_and_persists_across_restarts() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("机柜 #1?mode=ro.sqlite3");
+        let pool = connect(&path).await.unwrap();
+        sqlx::query(
+            "INSERT INTO rooms VALUES ('room', 'DC', '机房', NULL, 'active', 'now', 'now')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool.close().await;
+        assert!(path.is_file());
+        let reopened = connect(&path).await.unwrap();
+        let name: String = sqlx::query_scalar("SELECT name FROM rooms WHERE id = 'room'")
+            .fetch_one(&reopened)
+            .await
+            .unwrap();
+        assert_eq!(name, "机房");
+        reopened.close().await;
+    }
 
     async fn insert_structure(pool: &sqlx::SqlitePool) {
         sqlx::query(
