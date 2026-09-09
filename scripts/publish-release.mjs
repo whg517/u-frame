@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import { verify } from "./release-artifacts.mjs"
-import { devPublishArgs, digest, publishArgs, verifyUploadedAssets } from "./lib/release-policy.mjs"
+import { devPublishArgs, digest, findDraftRelease, publishArgs, verifyUploadedAssets } from "./lib/release-policy.mjs"
 
 const root = resolve(import.meta.dirname, "..")
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version
@@ -31,8 +31,9 @@ dev 指发布通道，使用优化的 Release 构建，不包含 Debug 开发数
 const files = [...records.map((record) => join(assets, record.name)), join(assets, "SHA256SUMS"), join(assets, "release-manifest.json")]
 // Creation fails if the tag already has a release; never overwrite existing assets.
 execFileSync("gh", publishArgs(tag, files, notes), { cwd: root, stdio: "inherit" })
-const release = JSON.parse(execFileSync("gh", ["api", `repos/{owner}/{repo}/releases/tags/${tag}`], { cwd: root, encoding: "utf8" }))
-if (!release.draft) throw new Error("Release must remain a draft until uploads are verified")
+// The tag endpoint documents published releases; list with push access includes drafts.
+const pages = JSON.parse(execFileSync("gh", ["api", "--paginate", "--slurp", "repos/{owner}/{repo}/releases?per_page=100"], { cwd: root, encoding: "utf8" }))
+const release = findDraftRelease(pages.flat(), tag)
 verifyUploadedAssets(release.assets, files.map((path) => ({ name: basename(path), ...digest(path) })))
 const finalize = devPublishArgs(tag)
 if (finalize) execFileSync("gh", finalize, { cwd: root, stdio: "inherit" })

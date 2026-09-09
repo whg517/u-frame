@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
 import { collect, verify } from "../release-artifacts.mjs"
-import { assetName, devPublishArgs, digest, publishArgs, targets, verifyBinary, verifyUploadedAssets } from "../lib/release-policy.mjs"
+import { assetName, devPublishArgs, digest, findDraftRelease, publishArgs, targets, verifyBinary, verifyUploadedAssets } from "../lib/release-policy.mjs"
 
 const root = resolve(import.meta.dirname, "../..")
 const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version
@@ -141,6 +141,11 @@ test("only numbered dev tags publish directly; stable and RC remain drafts and n
 })
 
 test("remote uploads must be complete and hash-identical before dev publication", () => {
+  const draft = { tag_name: "v0.1.0-dev.1", draft: true, assets: [] }
+  assert.equal(findDraftRelease([draft], draft.tag_name), draft)
+  for (const releases of [[], [draft, draft], [{ ...draft, draft: false }]]) {
+    assert.throws(() => findDraftRelease(releases, draft.tag_name))
+  }
   const expected = [{ name: "test.dmg", size: 1, sha256: "a".repeat(64) }]
   const asset = { name: "test.dmg", size: 1, digest: `sha256:${"a".repeat(64)}`, state: "uploaded" }
   assert.doesNotThrow(() => verifyUploadedAssets([asset], expected))

@@ -78,3 +78,9 @@ export function verifyUploadedAssets(assets, expected) {
         matches[0].size !== file.size || matches[0].digest !== `sha256:${file.sha256}`) throw new Error("Uploaded asset digest mismatch")
   }
 }
+
+export function findDraftRelease(releases, tag) {
+  const matches = releases.filter((release) => release.tag_name === tag)
+  if (matches.length !== 1 || matches[0].draft !== true) throw new Error("Exactly one draft release must match the tag")
+  return matches[0]
+}
