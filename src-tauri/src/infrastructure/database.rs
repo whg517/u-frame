@@ -47,7 +47,13 @@ mod tests {
     #[tokio::test]
     async fn opens_literal_paths_and_persists_across_restarts() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("机柜 #1?mode=ro.sqlite3");
+        // '?' is illegal in Windows filenames; '%' still exercises literal URI handling.
+        let filename = if cfg!(windows) {
+            "机柜 #1%mode=ro.sqlite3"
+        } else {
+            "机柜 #1?mode=ro.sqlite3"
+        };
+        let path = directory.path().join(filename);
         let pool = connect(&path).await.unwrap();
         sqlx::query(
             "INSERT INTO rooms VALUES ('room', 'DC', '机房', NULL, 'active', 'now', 'now')",

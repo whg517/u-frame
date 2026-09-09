@@ -2,7 +2,7 @@
 
 | 属性 | 内容 |
 |---|---|
-| 状态 | Accepted |
+| 状态 | Accepted；发行部分由 [ADR-008](0008-platform-release-matrix.md) 替代（2026-09-09） |
 | 日期 | 2026-09-07 |
 | 决策人 | UFrame maintainers |
 

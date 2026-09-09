@@ -1,6 +1,19 @@
 name: Release
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/**"
+      - "src-tauri/**"
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".node-version"
+      - "rust-toolchain.toml"
+      - "*config*"
   push:
     tags: ["v*.*.*"]
 
@@ -11,13 +24,17 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   verify-source:
     name: verify-release-source
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - name: Check out tagged source
+      - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -31,7 +48,8 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - name: Validate release tag and main ancestry
+      - name: Validate annotated tag and main ancestry
+        if: startsWith(github.ref, 'refs/tags/v')
         run: bash scripts/check-release-source.sh
       - name: Install Rust toolchain
         run: node scripts/install-rust-toolchain.mjs
@@ -40,20 +58,49 @@ jobs:
       - name: Run complete quality gate
         run: pnpm gate
 
-  macos-universal:
-    name: signed-universal-macos
+  build:
+    name: build-${{ matrix.id }}
     needs: verify-source
-    runs-on: macos-15
-    timeout-minutes: 90
-    environment: release
-    permissions:
-      contents: write
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: macos-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - id: windows-amd64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - id: linux-amd64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb
+          - id: linux-arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            bundles: deb
+    env:
+      RELEASE_TARGET: ${{ matrix.id }}
+      RUST_TARGET: ${{ matrix.target }}
+      BUNDLES: ${{ matrix.bundles }}
+      CARGO_INCREMENTAL: "0"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
-      - name: Check out tagged source
+      - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf
       - name: Install pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
@@ -63,32 +110,59 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - name: Revalidate release source on the signing runner
-        run: bash scripts/check-release-source.sh
-      - name: Install Rust toolchain and macOS targets
-        run: node scripts/install-rust-toolchain.mjs --universal
+      - name: Install Rust toolchain
+        run: node scripts/install-rust-toolchain.mjs
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build signed and notarized universal application
-        id: signed_build
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: bash scripts/build-signed-release.sh
-      - name: Verify application and prepare checksum
-        run: >-
-          pnpm release:verify
-          "${GITHUB_WORKSPACE}/src-tauri/target/universal-apple-darwin/release/bundle"
-          "${RUNNER_TEMP}/SHA256SUMS"
-      - name: Create draft GitHub release
+      - name: Test native backend
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --all-targets
+      - name: Build native installer
+        run: pnpm tauri build --target "$RUST_TARGET" --bundles "$BUNDLES"
+      - name: Verify macOS ad-hoc signature
+        if: runner.os == 'macOS'
+        run: codesign --verify --deep --strict "src-tauri/target/$RUST_TARGET/release/bundle/macos/UFrame.app"
+      - name: Validate and collect package
+        run: |
+          binary="src-tauri/target/$RUST_TARGET/release/u-frame"
+          if [[ "$RELEASE_TARGET" == "windows-amd64" ]]; then binary="$binary.exe"; fi
+          if [[ "$RELEASE_TARGET" == "macos-arm64" ]]; then binary="src-tauri/target/$RUST_TARGET/release/bundle/macos/UFrame.app/Contents/MacOS/u-frame"; fi
+          node scripts/release-artifacts.mjs collect "$RELEASE_TARGET" "src-tauri/target/$RUST_TARGET/release/bundle" "$binary" "$RUNNER_TEMP/release-assets"
+      - name: Upload verified build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.id }}
+          path: ${{ runner.temp }}/release-assets/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish-release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [verify-source, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Revalidate tag
+        run: bash scripts/check-release-source.sh
+      - name: Download this run's complete matrix
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: package-*
+          path: ${{ runner.temp }}/packages
+      - name: Verify all packages and publish
         id: publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          bash scripts/publish-release.sh
-          "${GITHUB_WORKSPACE}/src-tauri/target/universal-apple-darwin/release/bundle"
-          "${RUNNER_TEMP}/SHA256SUMS"
+        run: node scripts/publish-release.mjs "$RUNNER_TEMP/packages"

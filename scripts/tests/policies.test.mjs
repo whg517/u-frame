@@ -66,15 +66,20 @@ test("workflow policy rejects privilege expansion, mutable actions and interpola
   }
 })
 
-test("release checks require isolated gate, environment and verification before publishing", () => {
+test("release checks require isolated gate, complete native matrix and tag-only verified publishing", () => {
   const mutations = [
     (w) => { delete w.jobs["verify-source"] },
-    (w) => { w.jobs["macos-universal"].needs = [] },
-    (w) => { delete w.jobs["macos-universal"].environment },
-    (w) => { w.jobs["macos-universal"].env = { KEY: "${{ secrets.KEY }}" } },
-    (w) => { w.jobs["macos-universal"].steps.reverse() },
-    (w) => { w.jobs["macos-universal"].steps.find((s) => s.run?.startsWith("pnpm release:verify"))["continue-on-error"] = true },
-    (w) => { w.jobs["macos-universal"].permissions["id-token"] = "write" },
+    (w) => { w.jobs.build.needs = [] },
+    (w) => { w.jobs.build.strategy.matrix.include.pop() },
+    (w) => { w.jobs.build.strategy.matrix.include[0].target = "x86_64-apple-darwin" },
+    (w) => { w.jobs.build.permissions = { contents: "write" } },
+    (w) => { w.jobs.build.env = { KEY: "${{ secrets.KEY }}" } },
+    (w) => { w.jobs.publish.needs = ["verify-source"] },
+    (w) => { delete w.jobs.publish.if },
+    (w) => { w.jobs.publish.steps.find((s) => s.id === "publish")["continue-on-error"] = true },
+    (w) => { w.jobs.publish.permissions["id-token"] = "write" },
+    (w) => { w.jobs.build.steps.find((s) => s.uses?.startsWith("actions/upload-artifact")).with["if-no-files-found"] = "warn" },
+    (w) => { w.jobs.build.steps.find((s) => s.run?.includes("release-artifacts.mjs collect")).if = false },
     (w) => { w.on.workflow_dispatch = {} },
   ]
   for (const mutate of mutations) {

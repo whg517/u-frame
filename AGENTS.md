@@ -4,7 +4,7 @@
 
 ## 1. 项目定位
 
-UFrame 是一个面向 macOS 的本地桌面机柜与物理设备资产管理工具。
+UFrame 是一个面向 macOS、Windows 和 Linux 的本地桌面机柜与物理设备资产管理工具。
 
 MVP 的核心闭环：
 
@@ -35,7 +35,7 @@ MVP 管理四类设备：
 - Iteration 005 已将画布、详情、列表和表单组成连续任务：支持安全返回原上下文、已知父级预选、详情后续动作、整行导航和 URL 搜索筛选。
 - 设备已支持原子移动和保留历史放置行的下架；上架/移动页可查看连续空闲 U 位和具体冲突对象。
 - CSP 已限制为本地资源与 Tauri IPC，默认 opener 权限已移除。
-- GitHub CI、协作模板、Dependabot 和 macOS Universal 签名公证发布流程已建立；正式发行仍需 Apple 凭据与 Draft Release 人工验收。
+- GitHub CI、协作模板、Dependabot 与四平台安装包发布流程已建立；macOS arm64、Windows amd64、Linux amd64/arm64 通过 GitHub Release 分发，dev 预发行与正式 Draft 分开，详见 ADR-008。
 - 设置页已支持系统/浅色/深色外观、五种主题色、简体中文/英语全局切换、默认画布缩放、三档界面密度与字号、默认启动页面、即时本地持久化和恢复默认。
 - Excel 导入导出和完整审计尚未接入；产品明确不提供数据备份、迁移或恢复功能。
 
@@ -50,7 +50,7 @@ MVP 管理四类设备：
 3. [技术设计文档](docs/TECHNICAL_DESIGN.md)：定义架构方案、数据设计、安全、测试和 ADR 待办。
 4. [开发规范](docs/DEVELOPMENT_GUIDE.md)：定义 worktree、提交门禁、PR 和 squash 合并流程。
 5. [GitHub 项目治理](docs/GITHUB_GOVERNANCE.md)：定义远程仓库、流水线、保护规则和 workflow 安全边界。
-6. [发布规范](docs/RELEASING.md)：定义版本、tag、macOS Universal 构建、签名、公证和 Release 验收。
+6. [发布规范](docs/RELEASING.md)：定义版本、tag、四平台构建、dev 预发行与 Release 验收。
 7. [仓库治理规范](docs/REPOSITORY_GOVERNANCE.md)：定义根文件清单、架构边界和可执行治理控制；完整索引见 [docs](docs/README.md)。
 
 发生冲突时：
@@ -70,7 +70,7 @@ MVP 管理四类设备：
 - SSH、远程开关机、批量执行或其他远程运维。
 - 登录、多用户、权限、审批或远程服务端。
 - CMDB、钉钉或其他平台的实时同步。
-- Windows、Linux 或移动端适配。
+- Intel Mac、Windows arm64、32 位或移动端适配。
 - 机柜背面视图。
 - 将未上架设备从台账拖入机柜。
 - 端口、线缆、配线架、电源链路或网络拓扑。
@@ -264,6 +264,7 @@ Tauri 权限控制不能替代 Command 内部的确定性输入校验和领域�
 - `packageManager` 字段和 `pnpm-lock.yaml` 是版本真相源。
 - Rust 依赖由 Cargo 管理并提交 `src-tauri/Cargo.lock`。
 - 新增依赖前说明用途，优先选择维护活跃、范围小、无需高权限的库。
+- 平台矩阵固定为 macOS arm64、Windows amd64、Linux amd64/arm64；不执行 Apple 商店发行、Developer ID 或公证。macOS 仅 ad-hoc 签名，Windows 无证书签名。dev.N tag 可发布 Pre-release，其余版本只创建 Draft；四包与来源/摘要全部验证后才能发布。
 - 修改依赖后更新对应锁文件，并检查构建脚本权限配置。
 - 对版本、API 或安全行为不确定时，查阅当前官方文档，不凭记忆猜测。
 - SQLx 选择已由 ADR-001 确认；替换持久化方案需新 ADR，不沿用过时的待选型说明。

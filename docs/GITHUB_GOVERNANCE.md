@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.1 |
+| 版本 | v1.2 |
 | 更新日期 | 2026-09-09 |
 | 仓库 | `whg517/u-frame` |
 | 关联文档 | [贡献指南](../CONTRIBUTING.md) · [开发规范](DEVELOPMENT_GUIDE.md) · [发布规范](RELEASING.md) · [安全策略](../SECURITY.md) |
@@ -16,7 +16,7 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 
 ## 2. Issue 与 Pull Request
 
-- 缺陷使用结构化表单，必须提供版本、macOS 环境、复现步骤和预期/实际结果。
+- 缺陷使用结构化表单，必须提供版本、操作系统与架构、复现步骤和预期/实际结果。
 - 功能建议先说明用户场景和期望结果，并确认不偏离本地桌面产品边界。
 - 安全漏洞不进入普通 Issue；当前 Private 仓库按 [安全策略](../SECURITY.md) 通过既有私密渠道联系所有者。
 - Pull Request 使用统一模板，追踪用户故事和 PRD，记录验证、数据兼容性、回滚及已知限制。
@@ -57,7 +57,7 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 
 ### Release
 
-[Release workflow](../.github/workflows/release.yml) 仅响应 `v*.*.*` tag，默认 `contents: read`。verify-source 在无发布 environment 的独立 job 验证四处版本、annotated tag、主线归属并执行完整门禁。随后 macos-universal job 才使用 `release` environment 和 `contents: write`，重检来源并执行签名、双架构、公证、staple、Gatekeeper 与摘要验证，只创建 Draft。GitHub Release 的人工发布步骤不会由 tag push 自动替代。
+[Release workflow](../.github/workflows/release.yml) 响应版本 tag 和相关 main PR 试构建，默认只读。verify-source 执行完整门禁并对 tag 校验四处版本、annotated tag 和主线归属；四个平台的 build job 全部成功后，只有 tag 事件的 publish job 获得 contents: write。重新验证全部包的来源、架构清单和摘要后，dev.N 发布 Pre-release，稳定及其他版本只创建 Draft。详见 [ADR-008](adr/0008-platform-release-matrix.md)。
 
 ### 依赖更新
 
@@ -68,8 +68,8 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 - CI 使用 `pull_request`，不使用具有目标仓库写权限的 `pull_request_target` 执行贡献分支代码。
 - 每个 workflow 显式声明最小 `GITHUB_TOKEN` 权限。
 - 外部 Action 固定到完整 commit SHA，并由 Dependabot 提交更新 PR。
-- CI 不读取发布证书或 Apple 凭据。
-- 发布凭据只保存在 GitHub `release` environment secrets 中，仅注入 signed_build 步骤；GitHub token 仅显式注入 publish 步骤。脚本只检查是否存在，不打印值。step env 收窄意外暴露范围，但不是供应链或进程隔离沙箱。
+- CI 和发布流程均不读取外部签名证书或 Apple 凭据。
+- 不使用发布 environment 或 Apple secrets；仅 publish job 的发布步骤显式接收 GitHub token。构建 job 无仓库写权限；step env 不是供应链沙箱。
 - Release 只从 `main` 中的 annotated tag 构建；不接受任意分支输入或动态脚本 URL。
 - 构建产物不回写 Git，不把证书、数据库或用户数据打包进 Release。
 - pnpm 版本由 packageManager、Node 由 .node-version、Rust 由 rust-toolchain.toml 提供，不在 workflow 重复维护。
@@ -95,3 +95,4 @@ GitHub 是 UFrame 源码协作、Issue、Pull Request、自动门禁和发行制
 |---|---|---|
 | v1.0 | 2026-09-07 | 建立 GitHub 协作、权限和发布治理。 |
 | v1.1 | 2026-09-09 | 分离来源验证与签名 job，收窄凭据和写权限范围，增加可执行 workflow 政策。 |
+| v1.2 | 2026-09-09 | 按用户决定采用 macOS arm64、Windows amd64、Linux amd64/arm64 GitHub Release 分发，撤销原 Apple Universal 签名公证要求。 |

@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 状态 | Active |
-| 版本 | v1.0 |
+| 版本 | v1.1 |
 | 日期 | 2026-09-09 |
 | 范围 | 文档、实现代码、脚本、CI/Release、根目录文件 |
 
@@ -54,24 +54,24 @@
 - G-SCRIPT-01：脚本从自身位置定位仓库，路径带引号；参数或前置条件错误返回非零状态，不继续执行后续副作用。
 - G-SCRIPT-02：把可纯测的文档、版本、workflow 策略与文件系统 CLI 分离；Node 内建测试覆盖错误输入，shell 测试隔离外部命令。
 - G-SCRIPT-03：发布必须选中唯一 app/DMG；全部验证成功后原子生成摘要，发布前再次确认摘要绑定当前 DMG；不能取 glob 的第一项。
-- G-SCRIPT-04：测试外部工具 stub 只证明调用顺序与失败阻断，不证明 Apple 签名、公证或真实安装成功。
+- G-SCRIPT-04：二进制/制品 fixture 和外部工具 stub 只证明格式、调用与失败阻断，不证明四平台真实安装成功。
 - G-SCRIPT-05：脚本不能打印凭据，不能执行用户输入拼接的 shell；工作流表达式通过 env 进入固定脚本。
 
 ## 6. CI 和发布控制
 
 - G-CI-01：quality-gate 名称稳定，PR 和 main push 执行同一 pnpm gate；每个 job 有超时，外部 Action 固定完整 SHA。
 - G-CI-02：默认 contents: read，checkout 不保留凭据；禁止 pull_request_target/workflow_run 驱动的特权执行。
-- G-CI-03：Release 先在无发布环境的只读 job 验证来源和完整门禁，再运行独立签名 job；contents: write 只授予签名发布 job。
-- G-CI-04：Apple secrets 只注入 signed_build 步骤；GitHub token 仅显式注入 publish 步骤。step env 不是进程或供应链安全沙箱，依赖构建脚本仍须受信任和评审。
-- G-CI-05：产物需通过双架构、app/DMG 签名、app Gatekeeper、两者 stapled ticket 和 SHA-256 验证；只创建 Draft，人工安装验收后发布。
+- G-CI-03：Release 先在只读 job 验证来源和完整门禁，再由四个只读原生 job 构建；contents: write 只授予 tag 事件的汇总发布 job。
+- G-CI-04：不读取 Apple 或外部签名 secrets；GitHub token 仅显式注入 publish 步骤。step env 不是进程或供应链安全沙箱。
+- G-CI-05：四目标全部通过原生测试、构建、架构和来源绑定摘要校验才允许发布；dev.N 为非 latest 预发行，其他版本 Draft。缺失/重复/篡改包必须失败，禁止覆盖已发布版本。
 
-依据：[GitHub Actions 安全使用](https://docs.github.com/en/actions/reference/security/secure-use)要求最小权限、固定 Action 与谨慎处理不可信输入；[Apple Universal binary](https://developer.apple.com/documentation/apple-silicon/building-a-universal-macos-binary)说明双架构二进制约束。
+依据：[GitHub Actions 安全使用](https://docs.github.com/en/actions/reference/security/secure-use)要求最小权限、固定 Action 与谨慎处理不可信输入；[ADR-008](adr/0008-platform-release-matrix.md) 定义当前四平台矩阵与发行边界。
 
 ## 7. 控制证据与例外
 
 pnpm gate 自动执行仓库清单/工作流策略、脚本反例测试、独立 Domain 编译、文档追踪、四处版本、bindings、前端和 Rust 质量检查。具体顺序以 [gate.sh](../scripts/gate.sh) 为执行真相源；不能只改文档宣称增加了门禁。
 
-仍需人工评审：业务故事是否真实被验收、SQL 事务设计、前端任务连续性、依赖供应链、产品非目标、签名安装与远程保护是否真正启用。当前 workflow policy 不是完整 GitHub schema 验证器，不替代托管 CI；shell 语法检查不等于全量安全扫描。
+仍需人工评审：业务故事是否真实被验收、SQL 事务设计、前端任务连续性、依赖供应链、产品非目标、各平台安装体验与远程保护是否真正启用。当前 workflow policy 不是完整 GitHub schema 验证器，不替代托管 CI；shell 语法检查不等于全量安全扫描。
 
 例外必须记录原因、影响、证据和后续关闭条件，不能关闭严格检查、删除失败断言或绕过 hook。评审结果保存在 [Iteration 014](iterations/0014-repository-governance.md)。
 
@@ -80,3 +80,4 @@ pnpm gate 自动执行仓库清单/工作流策略、脚本反例测试、独立
 | 版本 | 日期 | 说明 |
 |---|---|---|
 | v1.0 | 2026-09-09 | 建立仓库治理责任、架构约束和可执行控制，明确未覆盖边界。 |
+| v1.1 | 2026-09-09 | 按用户决定采用 macOS arm64、Windows amd64、Linux amd64/arm64 GitHub Release 分发，撤销原 Apple Universal 签名公证要求。 |

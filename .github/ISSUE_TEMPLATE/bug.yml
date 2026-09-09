@@ -17,8 +17,8 @@ body:
   - type: input
     id: macos
     attributes:
-      label: macOS 与硬件
-      description: 例如 macOS 15.6，Apple Silicon
+      label: 操作系统与架构
+      description: 例如 macOS 15 arm64、Windows 11 amd64、Ubuntu 24.04 arm64
     validations:
       required: true
   - type: textarea
