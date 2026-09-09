@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.14 |
+| 版本 | v0.15 |
 | 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
@@ -26,7 +26,7 @@
 - 单机、单用户、离线可用，不依赖远程服务。
 - 机柜画布、设备台账和 U 位占用使用同一份权威数据。
 - 所有写操作经过领域校验和 SQLite 事务。
-- 数据可以安全备份、校验和恢复。
+- 业务数据库固定由应用管理，升级时只执行受控的 schema migration。
 - 在 500 台机柜、10,000 台设备规模下保持可用。
 - 首期交付可签名、可公证的 macOS 安装包。
 
@@ -36,6 +36,7 @@
 - 不接入设备监控、自动发现、SSH 或其他远程执行能力。
 - 不设计 Windows、Linux 或移动端兼容层。
 - 不提供机柜背面、端口、线缆、电源链路和网络拓扑模型。
+- 不提供数据备份、跨安装或跨目录迁移、数据恢复及用户自定义业务数据库位置。
 
 ## 3. 技术选型状态
 
@@ -79,7 +80,7 @@
                 ▼                   ▼
        ┌────────────────┐  ┌────────────────────────┐
        │ SQLite         │  │ 本地文件适配器         │
-       │ 业务数据/审计  │  │ Excel/CSV/备份/恢复    │
+       │ 业务数据/审计  │  │ Excel/CSV              │
        └────────────────┘  └────────────────────────┘
 ```
 
@@ -92,7 +93,7 @@
 | Tauri Commands | IPC 入口、反序列化、调用应用服务、映射返回值 | 编写 SQL或承载领域规则 |
 | Application Services | 编排用例、事务、仓储和审计记录 | 依赖 UI 类型或组件状态 |
 | Domain | 设备类型、U 位范围、冲突、状态迁移等纯业务规则 | 文件系统、数据库或 Tauri 依赖 |
-| Repositories / Adapters | SQLite、Excel、CSV、备份和系统路径实现 | 绕过应用服务直接暴露给前端 |
+| Repositories / Adapters | SQLite、Excel、CSV 和必要的系统路径实现 | 绕过应用服务直接暴露给前端 |
 
 ### 4.2 权威数据源
 
@@ -117,7 +118,6 @@ src/
 │   ├── assets/
 │   ├── rack-view/
 │   ├── imports/
-│   ├── backups/
 │   └── audit/
 ├── shared/
 │   ├── components/
@@ -239,7 +239,6 @@ src-tauri/
 │   ├── infrastructure/
 │   │   ├── database/
 │   │   ├── excel/
-│   │   ├── backup/
 │   │   └── clock.rs
 │   ├── dto/
 │   ├── state.rs
@@ -274,7 +273,6 @@ SQLite 建议配置：
 | placements | `place_asset`、`move_asset`、`move_assets`、`unplace_asset` |
 | imports | `preview_asset_import`、`apply_asset_import`、`get_import_job` |
 | exports | `export_assets` |
-| backups | `create_backup`、`inspect_backup`、`restore_backup` |
 | audit | `list_audit_logs` |
 
 Command 只接受 DTO 并返回 `Result<T, AppErrorDto>`。Tauri Command 可以是异步函数，因此数据库和较长文件操作不应阻塞 WebView 交互线程。
@@ -461,30 +459,11 @@ COMMIT
 - 不确定的 U 高度、型号或硬件参数保持为空，不推测填充。
 - 大文件解析通过异步 Command 执行；需要进度时使用 Tauri Channel，而不是高频全局事件。
 
-### 8.3 备份与恢复
-
-备份文件建议使用 `.uframe-backup` 扩展名，内容包含：
-
-- 一致性 SQLite 快照
-- `manifest.json`：应用版本、schema 版本、创建时间、文件摘要
-- 必要的本地配置；不得包含缓存、日志或临时导入文件
-
-备份使用 SQLite Online Backup API 或 `VACUUM INTO` 创建一致快照，不在数据库写入期间直接复制 `.db` 文件。
-
-恢复流程：
-
-1. 读取 manifest 并校验文件摘要和兼容版本。
-2. 对备份数据库执行 `PRAGMA integrity_check`。
-3. 自动创建当前数据的恢复前安全备份。
-4. 停止写入并关闭现有数据库连接。
-5. 原子替换数据库文件，重新连接并执行兼容迁移。
-6. 重新读取核心数据并展示恢复摘要。
-
 ## 9. 安全设计
 
 ### 9.1 信任边界
 
-React WebView 输入、Excel 内容、备份文件和用户选择的路径均视为不可信。Tauri IPC 是 WebView 与具备系统权限的 Rust Core 之间的信任边界。
+React WebView 输入、Excel 内容和用户选择的路径均视为不可信。Tauri IPC 是 WebView 与具备系统权限的 Rust Core 之间的信任边界。
 
 - 每个 Command 在 Rust 侧重新校验输入，前端校验不能作为安全边界。
 - 数据库、文件系统和系统 API 只能由 Rust adapter 访问。
@@ -503,8 +482,7 @@ React WebView 输入、Excel 内容、备份文件和用户选择的路径均视
 
 - MVP 不保存远程设备密码、SSH Key 或 API Token。
 - 日志避免记录完整资产导入行、敏感备注和本地绝对路径。
-- SQLite 文件、备份和日志使用操作系统应用数据目录或用户明确选择的位置。
-- 恢复属于破坏性操作，必须明确确认并先创建恢复前备份。
+- SQLite 文件和日志使用操作系统应用数据目录；业务数据库位置不向用户开放修改。
 
 ## 10. 性能设计
 
@@ -524,7 +502,7 @@ React WebView 输入、Excel 内容、备份文件和用户选择的路径均视
 
 - Domain 单元测试：U 位边界、范围重叠、设备状态和机柜状态。
 - Repository 集成测试：临时 SQLite、迁移、唯一索引、trigger 和事务回滚。
-- Application 测试：创建、移动、下架、归档、导入应用和恢复编排。
+- Application 测试：创建、移动、下架、归档和导入应用编排。
 - Command 契约测试：DTO 序列化、错误码和输入拒绝。
 
 ### 11.2 React
@@ -543,8 +521,7 @@ React WebView 输入、Excel 内容、备份文件和用户选择的路径均视
 - 画布、详情和带筛选列表发起的操作在取消或成功后恢复原任务上下文。
 - 上架与移动页的连续空闲范围、冲突设备和最终 U 位与 Rust 端校验结果一致。
 - 导入预览不会修改正式数据，应用后复核数量一致。
-- 备份恢复后实体数量、当前放置和 schema 版本一致。
-- macOS 打包产物可启动、可创建数据库、可导入和备份。
+- macOS 打包产物可启动、可创建数据库并可完成已实现的核心业务闭环。
 
 ### 11.4 建议门禁
 
@@ -601,7 +578,7 @@ main 上的版本提交
 - 使用 Developer ID Application 证书签名，完成 Apple notarization 和 staple 验证。
 - 使用 Universal Binary 同时支持 Apple Silicon 与 Intel，并分别完成真实安装启动验收。
 - 生成 SHA-256 摘要，Draft Release 中只上传流水线验证的制品。
-- 执行当前发布范围的数据库迁移、核心业务、主题和窗口回归；导入、备份和审计上线后再加入必测矩阵。
+- 执行当前发布范围的数据库 schema migration、核心业务、主题和窗口回归；导入和审计上线后再加入必测矩阵。
 
 详细操作、凭据、故障与回滚见 [发布规范](RELEASING.md)；架构和流水线决策见 [ADR-005](adr/0005-macos-universal-distribution.md) 和 [ADR-006](adr/0006-github-delivery-pipeline.md)。
 
@@ -613,14 +590,13 @@ main 上的版本提交
 4. 已实现上架、原子移动和保留历史的下架事务；审计日志和历史查询留待后续切片。
 5. 已实现网格多机柜画布、50%–160% 缩放、机柜顺序持久化和设备详情交互；虚拟化留待后续切片。
 6. 实现导入 staging、差异预览、确认应用和导出。
-7. 实现审计、备份、恢复和迁移兼容测试。
+7. 实现审计和数据库 schema 升级兼容测试。
 8. 已配置 GitHub 质量门禁和 macOS Universal 签名公证流水线；Apple 凭据配置和首个发行安装验收待执行。
 
 ## 15. ADR 待办
 
 | ADR | 决策问题 | 候选方案 | 完成阶段 |
 |---|---|---|---|
-| ADR-003 | 一致性备份实现 | SQLite Backup API / `VACUUM INTO` | M4 开始前 |
 | ADR-004 | Excel 解析和生成库 | Rust 生态候选库实测比较 | M3 开始前 |
 | [ADR-005](adr/0005-macos-universal-distribution.md) | macOS 架构产物 | 采用 Universal app + DMG | 已完成 |
 | [ADR-006](adr/0006-github-delivery-pipeline.md) | GitHub 集成和发行流水线 | 主线 PR 门禁 + tag 驱动 Draft Release | 已完成 |
@@ -631,7 +607,7 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 
 - 归档、审计和历史查询尚未实现；单设备移动、下架与画布批量调整事务已交付。
 - 可视区域虚拟化及 100 台机柜性能验证尚未实现。
-- Excel、导出、备份和恢复适配器尚未实现。
+- Excel 导入导出适配器尚未实现。
 - GitHub CI 和发布 workflow 已建立；Apple 签名凭据、首个 Draft Release 及 Intel/Apple Silicon 安装验收尚未执行。
 
 ## 17. 参考资料
@@ -641,8 +617,6 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 - [Tauri：安全模型](https://v2.tauri.app/security/)
 - [SQLx：SQLite 驱动](https://docs.rs/sqlx/latest/sqlx/sqlite/)
 - [SQLx：内嵌迁移](https://docs.rs/sqlx/latest/sqlx/macro.migrate.html)
-- [SQLite：Online Backup API](https://www.sqlite.org/backup.html)
-- [SQLite：VACUUM INTO](https://www.sqlite.org/lang_vacuum.html)
 - [Tauri：macOS 签名与公证](https://v2.tauri.app/distribute/sign/macos/)
 - [Tauri：GitHub Actions 发布](https://v2.tauri.app/distribute/pipelines/github/)
 - [GitHub Actions 安全加固](https://docs.github.com/en/code-security/tutorials/secure-your-organization/protect-against-threats)
@@ -666,3 +640,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.12 | 2026-09-08 | 将默认机柜画布缩放纳入本地偏好，并明确进入画布与缩放重置行为。 |
 | v0.13 | 2026-09-09 | 增加根节点界面密度与字号 token、默认值、旧偏好兼容和机柜几何隔离约束。 |
 | v0.14 | 2026-09-09 | 增加默认启动页面偏好、首屏前根路径替换、深链保护和延迟路由创建方案。 |
+| v0.15 | 2026-09-09 | 移除备份与恢复架构方案，将数据迁移和自定义数据库位置明确为非目标，并保留内部 schema migration。 |
