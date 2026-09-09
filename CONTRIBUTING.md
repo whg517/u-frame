@@ -18,7 +18,7 @@ pnpm hooks:install
 
 ## 开发要求
 
-- 保持 `app → features → shared` 和 `Command → Application → Domain → Repository` 依赖方向。
+- 保持 `app → features → shared`；Rust 由 Command 调用 Application，Application 使用纯 Domain 与自有端口，Infrastructure 实现端口，Domain 不依赖 Repository。当前迁移边界见 [ADR-007](docs/adr/0007-domain-and-transaction-ports.md)。
 - 用户可见文案默认使用中文；稳定错误码、代码标识符和数据库字段使用英文。
 - 数据不变量必须由 Rust 和 SQLite 事务边界保护，不能只依赖前端校验。
 - UI 修改必须在真实 Tauri 窗口中检查关键状态。

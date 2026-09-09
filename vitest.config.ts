@@ -9,6 +9,7 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
+    include: ["src/**/*.test.{ts,tsx}", "scripts/eslint-boundaries.test.js"],
     environment: "jsdom",
     setupFiles: ["./src/testing/setup.ts"],
     css: true,

@@ -1,104 +1,35 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
+import { dirname, resolve, relative, isAbsolute } from "node:path"
+import { markdownBody, traceabilityErrors } from "./lib/document-policy.mjs"
 
-const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = resolve(scriptDirectory, "..");
-const docsDirectory = resolve(repositoryRoot, "docs");
-
+const root = resolve(import.meta.dirname, "..")
 function markdownFilesBelow(directory) {
-  if (!existsSync(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const entryPath = resolve(directory, entry.name);
-    if (entry.isDirectory()) return markdownFilesBelow(entryPath);
-    return extname(entry.name) === ".md" ? [entryPath] : [];
-  });
+    const path = resolve(directory, entry.name)
+    return entry.isDirectory() ? markdownFilesBelow(path) : entry.name.endsWith(".md") ? [path] : []
+  })
 }
-
-const markdownFiles = [
-  resolve(repositoryRoot, "AGENTS.md"),
-  resolve(repositoryRoot, "README.md"),
-  resolve(repositoryRoot, "CHANGELOG.md"),
-  resolve(repositoryRoot, "CONTRIBUTING.md"),
-  resolve(repositoryRoot, "SECURITY.md"),
-  ...markdownFilesBelow(docsDirectory),
-  ...markdownFilesBelow(resolve(repositoryRoot, ".github")),
-];
-
-const errors = [];
-
-for (const file of markdownFiles) {
-  if (!existsSync(file) || statSync(file).size === 0) {
-    errors.push(`Missing or empty Markdown file: ${file}`);
-    continue;
-  }
-
-  const content = readFileSync(file, "utf8");
-  const fenceCount = (content.match(/^```/gm) ?? []).length;
-  if (fenceCount % 2 !== 0) {
-    errors.push(`Unclosed fenced code block: ${file}`);
-  }
-
-  const linkPattern = /\[[^\]]+\]\(([^)]+)\)/g;
-  for (const match of content.matchAll(linkPattern)) {
-    const rawTarget = match[1].trim();
-    if (
-      rawTarget.startsWith("http://") ||
-      rawTarget.startsWith("https://") ||
-      rawTarget.startsWith("mailto:") ||
-      rawTarget.startsWith("#")
-    ) {
-      continue;
-    }
-
-    const fileTarget = decodeURIComponent(rawTarget.split("#", 1)[0]);
-    const absoluteTarget = resolve(dirname(file), fileTarget);
-    if (!existsSync(absoluteTarget)) {
-      errors.push(`Broken relative link in ${file}: ${rawTarget}`);
-    }
+const files = [
+  ...readdirSync(root).filter((name) => name.endsWith(".md")).map((name) => resolve(root, name)),
+  ...markdownFilesBelow(resolve(root, "docs")),
+  ...markdownFilesBelow(resolve(root, ".github")),
+]
+const errors = []
+for (const file of files) {
+  if (statSync(file).size === 0) { errors.push(`Empty Markdown: ${file}`); continue }
+  const { body, unclosedFence } = markdownBody(readFileSync(file, "utf8"))
+  if (unclosedFence) errors.push(`Unclosed fenced code block: ${file}`)
+  for (const [, raw] of body.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+    const target = raw.trim().match(/^<([^>]+)>|^(\S+)/)?.slice(1).find(Boolean)
+    if (!target || /^(https?:|mailto:|#)/.test(target)) continue
+    try {
+      const path = resolve(dirname(file), decodeURIComponent(target.split("#")[0]))
+      const local = relative(root, path)
+      if (local.startsWith("..") || isAbsolute(local) || !existsSync(path)) errors.push(`Broken or external local link in ${file}: ${target}`)
+    } catch { errors.push(`Malformed link in ${file}: ${target}`) }
   }
 }
-
-const requirementPattern = /\b(?:LOC|RACK|AST|PLC|VIEW|IMP|EXP|BAK|AUD|UX|SET)-\d{3}\b/g;
-const prdContent = readFileSync(resolve(docsDirectory, "PRD.md"), "utf8");
-const storiesContent = readFileSync(
-  resolve(docsDirectory, "USER_STORIES.md"),
-  "utf8",
-);
-
-const prdRequirements = new Set(prdContent.match(requirementPattern) ?? []);
-const storyReferences = new Set(storiesContent.match(requirementPattern) ?? []);
-const missingReferences = [...prdRequirements].filter(
-  (requirement) => !storyReferences.has(requirement),
-);
-
-if (missingReferences.length > 0) {
-  errors.push(
-    `PRD requirements missing from USER_STORIES.md: ${missingReferences.join(", ")}`,
-  );
-}
-
-const storyHeadingPattern = /^### (US-[A-Z]+-\d{3})\b/gm;
-const storyIds = [...storiesContent.matchAll(storyHeadingPattern)].map(
-  (match) => match[1],
-);
-const duplicateStoryIds = storyIds.filter(
-  (storyId, index) => storyIds.indexOf(storyId) !== index,
-);
-
-if (duplicateStoryIds.length > 0) {
-  errors.push(
-    `Duplicate user story IDs: ${[...new Set(duplicateStoryIds)].join(", ")}`,
-  );
-}
-
-if (errors.length > 0) {
-  for (const error of errors) {
-    console.error(`ERROR: ${error}`);
-  }
-  process.exit(1);
-}
-
-console.log(
-  `Documentation checks passed: ${markdownFiles.length} files, ${prdRequirements.size} requirements, ${storyIds.length} user stories.`,
-);
+const trace = traceabilityErrors(readFileSync(resolve(root, "docs/PRD.md"), "utf8"), readFileSync(resolve(root, "docs/USER_STORIES.md"), "utf8"))
+errors.push(...trace.errors)
+if (errors.length) { errors.forEach((error) => console.error(`ERROR: ${error}`)); process.exit(1) }
+console.log(`Documentation checks passed: ${files.length} files, ${trace.requirements} requirements, ${trace.stories} user stories.`)

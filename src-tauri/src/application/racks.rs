@@ -1,9 +1,10 @@
+use crate::infrastructure::database_error::database_error;
 use std::collections::HashSet;
 
 use sqlx::{Row, SqlitePool};
 
 use crate::{
-    domain,
+    application::validation as domain,
     dto::{CreateRackInput, RackDto, ReorderRacksInput, ReorderRacksResultDto, UpdateRackInput},
     error::AppErrorDto,
     infrastructure::repository,
@@ -19,7 +20,7 @@ pub async fn list_racks(
     repository::list_racks(pool, area_id.as_deref())
         .await
         .map(|rows| rows.into_iter().map(rack_dto).collect())
-        .map_err(|error| AppErrorDto::database(operation_id, error))
+        .map_err(|error| database_error(operation_id, error))
 }
 
 pub async fn create_rack(
@@ -42,7 +43,7 @@ pub async fn create_rack(
     .bind(&area_id)
     .fetch_optional(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     let Some(parent) = parent else {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -69,7 +70,7 @@ pub async fn create_rack(
     )
     .fetch_one(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     sqlx::query(
         "INSERT INTO racks (id, area_id, code, specification, total_u, power_capacity_w, status, notes, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)",
     )
@@ -85,7 +86,7 @@ pub async fn create_rack(
     .bind(sort_order)
     .execute(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     Ok(RackDto {
         id: rack_id,
         area_id,
@@ -120,14 +121,14 @@ pub async fn update_rack(
     let mut transaction = pool
         .begin()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let parent = sqlx::query(
         "SELECT area.status AS area_status, area.name AS area_name, room.id AS room_id, room.name AS room_name, room.status AS room_status FROM areas area JOIN rooms room ON room.id = area.room_id WHERE area.id = ?",
     )
     .bind(&area_id)
     .fetch_optional(&mut *transaction)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     let Some(parent) = parent else {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -152,7 +153,7 @@ pub async fn update_rack(
     .bind(&rack_id)
     .fetch_one(&mut *transaction)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     if highest_end_u.is_some_and(|end_u| end_u > input.total_u) {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -175,7 +176,7 @@ pub async fn update_rack(
     .bind(&rack_id)
     .execute(&mut *transaction)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     if result.rows_affected() == 0 {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -187,7 +188,7 @@ pub async fn update_rack(
     transaction
         .commit()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     Ok(RackDto {
         id: rack_id,
         area_id,
@@ -229,10 +230,10 @@ pub async fn reorder_racks(
     let mut transaction = pool
         .begin()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let current_order = repository::list_active_rack_ids(&mut *transaction)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let active_ids: HashSet<&str> = current_order.iter().map(String::as_str).collect();
     if input
         .rack_ids
@@ -268,7 +269,7 @@ pub async fn reorder_racks(
             .bind(rack_id)
             .execute(&mut *transaction)
             .await
-            .map_err(|error| AppErrorDto::database(operation_id, error))?;
+            .map_err(|error| database_error(operation_id, error))?;
     }
     for rack_id in &input.rack_ids {
         sqlx::query("UPDATE racks SET updated_at = ? WHERE id = ?")
@@ -276,12 +277,12 @@ pub async fn reorder_racks(
             .bind(rack_id)
             .execute(&mut *transaction)
             .await
-            .map_err(|error| AppErrorDto::database(operation_id, error))?;
+            .map_err(|error| database_error(operation_id, error))?;
     }
     transaction
         .commit()
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
 
     Ok(ReorderRacksResultDto {
         rack_ids: input.rack_ids,

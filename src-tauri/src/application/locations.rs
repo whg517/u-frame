@@ -1,9 +1,10 @@
+use crate::infrastructure::database_error::database_error;
 use std::collections::HashMap;
 
 use sqlx::SqlitePool;
 
 use crate::{
-    domain,
+    application::validation as domain,
     dto::{
         AreaDto, CreateAreaInput, CreateRoomInput, LocationTreeDto, RoomDto, RoomNodeDto,
         UpdateAreaInput, UpdateRoomInput,
@@ -20,10 +21,10 @@ pub async fn list_locations(
 ) -> Result<LocationTreeDto, AppErrorDto> {
     let rooms = repository::list_rooms(pool)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let areas = repository::list_areas(pool)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let mut areas_by_room: HashMap<String, Vec<AreaDto>> = HashMap::new();
     for area in areas {
         areas_by_room
@@ -66,7 +67,7 @@ pub async fn create_room(
     .bind(&timestamp)
     .execute(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     Ok(RoomDto {
         id: room_id,
         code,
@@ -96,7 +97,7 @@ pub async fn update_room(
     .bind(&room_id)
     .execute(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     if result.rows_affected() == 0 {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -127,7 +128,7 @@ pub async fn create_area(
         .bind(&room_id)
         .fetch_optional(pool)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     if parent_status.as_deref() != Some("active") {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -150,7 +151,7 @@ pub async fn create_area(
     .bind(&timestamp)
     .execute(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     Ok(AreaDto {
         id: area_id,
         room_id,
@@ -175,7 +176,7 @@ pub async fn update_area(
         .bind(&room_id)
         .fetch_optional(pool)
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     if parent_status.as_deref() != Some("active") {
         return Err(AppErrorDto::validation(
             operation_id,
@@ -196,7 +197,7 @@ pub async fn update_area(
     .bind(&area_id)
     .execute(pool)
     .await
-    .map_err(|error| AppErrorDto::database(operation_id, error))?;
+    .map_err(|error| database_error(operation_id, error))?;
     if result.rows_affected() == 0 {
         return Err(AppErrorDto::validation(
             operation_id,

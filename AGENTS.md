@@ -51,6 +51,7 @@ MVP 管理四类设备：
 4. [开发规范](docs/DEVELOPMENT_GUIDE.md)：定义 worktree、提交门禁、PR 和 squash 合并流程。
 5. [GitHub 项目治理](docs/GITHUB_GOVERNANCE.md)：定义远程仓库、流水线、保护规则和 workflow 安全边界。
 6. [发布规范](docs/RELEASING.md)：定义版本、tag、macOS Universal 构建、签名、公证和 Release 验收。
+7. [仓库治理规范](docs/REPOSITORY_GOVERNANCE.md)：定义根文件清单、架构边界和可执行治理控制；完整索引见 [docs](docs/README.md)。
 
 发生冲突时：
 
@@ -159,8 +160,8 @@ Tauri Command
 
 - Command 只负责 DTO、入口校验、调用应用服务和错误映射。
 - Application Service 负责用例、事务和审计编排。
-- 当前应用用例按位置、机柜、资产、放置和画布查询拆分；SQL 仍部分位于应用层，仓储提取属于后续重构，不得宣称已完成严格分层。
-- Domain 规则必须是可单元测试的纯 Rust 逻辑，不依赖 Tauri、SQL 或文件系统。
+- 批量移动通过应用层自有的事务端口调用 SQLite adapter；普通 CRUD 和单设备放置仍保留应用层 SQL，不得宣称全后端已完成仓储化。
+- Domain 规则必须是可独立编译测试的纯 Rust 逻辑，不依赖 IPC DTO、接口错误、Tauri、SQL 或文件系统；operationId 在应用层附加。
 - Repository/Adapter 负责 SQLite、Excel、CSV 和必要的系统路径。
 - 前端不得直接访问 SQLite、任意文件或本地命令。
 - 所有 IPC 输入在 Rust 侧重新校验；前端校验只用于用户体验。
@@ -265,7 +266,7 @@ Tauri 权限控制不能替代 Command 内部的确定性输入校验和领域�
 - 新增依赖前说明用途，优先选择维护活跃、范围小、无需高权限的库。
 - 修改依赖后更新对应锁文件，并检查构建脚本权限配置。
 - 对版本、API 或安全行为不确定时，查阅当前官方文档，不凭记忆猜测。
-- 未完成 ADR-001 前，不得把 SQLx 或 rusqlite 描述为最终选型。
+- SQLx 选择已由 ADR-001 确认；替换持久化方案需新 ADR，不沿用过时的待选型说明。
 
 ## 13. 开发与验证命令
 
@@ -313,9 +314,9 @@ cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-`pnpm gate` 已组合文档、应用版本一致性、bindings 漂移、ESLint、TypeScript、Vitest、前端构建、Rust format、Debug/Release Clippy 和 Rust 全量测试；不得绕过其中任何一项。
+`pnpm gate` 已组合根文件/工作流/架构政策、脚本反例测试、独立 Domain 编译、文档、四处应用版本一致性、bindings 漂移、ESLint、业务和配置 TypeScript、Vitest、前端构建、Rust format、Debug/Release Clippy 和 Rust 全量测试；不得绕过其中任何一项。
 
-仅修改 Markdown 时不要求重复执行应用构建，但必须检查：
+仅修改 Markdown 的工作中可先运行轻量文档检查；这不豁免第 16 节的提交、PR 和合并前完整门禁。文档检查包括：
 
 - 相对链接目标存在。
 - 标题层级和代码块闭合。

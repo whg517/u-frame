@@ -1,3 +1,4 @@
+use crate::infrastructure::database_error::database_error;
 use std::collections::HashMap;
 
 use sqlx::SqlitePool;
@@ -15,7 +16,7 @@ pub async fn get_rack_view(
 ) -> Result<RackViewDto, AppErrorDto> {
     let rows = repository::rack_view(pool, area_id.as_deref())
         .await
-        .map_err(|error| AppErrorDto::database(operation_id, error))?;
+        .map_err(|error| database_error(operation_id, error))?;
     let mut rack_indexes: HashMap<String, usize> = HashMap::new();
     let mut racks: Vec<RackCanvasDto> = Vec::new();
     for row in rows {

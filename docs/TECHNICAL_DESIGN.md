@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.16 |
+| 版本 | v0.17 |
 | 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame MVP |
 | 目标平台 | macOS |
@@ -253,6 +253,8 @@ src-tauri/
 ```
 
 ### 6.2 应用状态
+
+当前落地：Domain 已不引用 DTO、接口错误或框架；批量布局规则位于 domain/layout.rs，事务编排位于 application/layout_service.rs，应用层定义 ports.rs，SQLite adapter 位于 infrastructure/layout_repository.rs。领域错误由应用层映射为 AppErrorDto 并附加 operationId；数据库分类位于 infrastructure。详见 [ADR-007](adr/0007-domain-and-transaction-ports.md)。上面的树是演进目标，不代表所有实体子目录已经存在。
 
 应用启动时完成以下动作：
 
@@ -537,7 +539,7 @@ React WebView 输入、Excel 内容和用户选择的路径均视为不可信。
 pnpm gate
 ```
 
-当前 `pnpm gate` 执行 Git 空白检查、Shell 语法检查、递归文档检查、三处应用版本一致性、bindings 漂移检查、前端 ESLint、TypeScript、Vitest 与构建，以及 Rust 格式、Debug/Release Clippy 和全量测试。GitHub `quality-gate` 在 macOS runner 执行同一入口。Universal DMG、签名和公证属于发布门禁，不在每次提交时执行。
+当前 `pnpm gate` 执行 Git 空白、Shell 语法、根文件/工作流/架构政策、脚本反例、独立 Domain 编译、递归文档和双向追踪、四处应用版本、bindings、前端 ESLint、业务与配置 TypeScript、Vitest 与构建，以及 Rust 格式、Debug/Release Clippy 和全量测试。GitHub `quality-gate` 在 macOS runner 执行同一入口。Universal DMG、签名和公证属于发布门禁，不在每次提交时执行。治理控制及人工边界见 [仓库治理规范](REPOSITORY_GOVERNANCE.md)。
 
 ## 12. 日志与审计
 
@@ -582,10 +584,11 @@ main 上的版本提交
 
 正式对外分发必须：
 
-- 三处应用版本与 tag 一致，tag 对应 `main` 中的不可变提交。
+- 四处应用版本（包含 Cargo.lock）与 tag 一致，tag 对应 `main` 中的不可变提交。
 - 使用 Developer ID Application 证书签名，完成 Apple notarization 和 staple 验证。
 - 使用 Universal Binary 同时支持 Apple Silicon 与 Intel，并分别完成真实安装启动验收。
-- 生成 SHA-256 摘要，Draft Release 中只上传流水线验证的制品。
+- 默认只读的独立 job 完成来源与完整门禁，签名发布 job 通过后才接续；Apple 凭据仅注入签名步骤。
+- 唯一 app/DMG 通过双架构、签名、Gatekeeper 和 staple 检查后原子生成 SHA-256；发布前重新核对当前 DMG，Draft 只上传验证制品。
 - 执行当前发布范围的数据库 schema migration、核心业务、主题和窗口回归；导入和审计上线后再加入必测矩阵。
 
 详细操作、凭据、故障与回滚见 [发布规范](RELEASING.md)；架构和流水线决策见 [ADR-005](adr/0005-macos-universal-distribution.md) 和 [ADR-006](adr/0006-github-delivery-pipeline.md)。
@@ -608,6 +611,7 @@ main 上的版本提交
 | ADR-004 | Excel 解析和生成库 | Rust 生态候选库实测比较 | M3 开始前 |
 | [ADR-005](adr/0005-macos-universal-distribution.md) | macOS 架构产物 | 采用 Universal app + DMG | 已完成 |
 | [ADR-006](adr/0006-github-delivery-pipeline.md) | GitHub 集成和发行流水线 | 主线 PR 门禁 + tag 驱动 Draft Release | 已完成 |
+| [ADR-007](adr/0007-domain-and-transaction-ports.md) | 纯领域与事务端口 | 标准库 Domain + 应用层端口 + SQLite adapter，按用例渐进迁移 | 已完成（批量移动切片） |
 
 ## 16. 当前脚手架差距
 
@@ -616,7 +620,7 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 - 归档、审计和历史查询尚未实现；单设备移动、下架与画布批量调整事务已交付。
 - 可视区域虚拟化及 100 台机柜性能验证尚未实现。
 - Excel 导入导出适配器尚未实现。
-- 应用层已按用例拆分文件并保留原事务边界，但 SQL 尚未完全提取为仓储；Domain 仍引用 DTO/错误类型，严格领域隔离尚未完成。
+- Domain 已与 DTO/框架隔离，批量移动已通过应用层端口编排；普通 CRUD 和单设备放置仍有应用层 SQL，不能宣称全后端仓储化完成。
 - 未保存修改的跨页离开保护、数据库初始化失败的可操作界面仍需单独交付。
 - 本轮设计与代码评审、风险排序和验证记录见 [Iteration 013](iterations/0013-design-and-code-review.md)。
 - GitHub CI 和发布 workflow 已建立；Apple 签名凭据、首个 Draft Release 及 Intel/Apple Silicon 安装验收尚未执行。
@@ -656,3 +660,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.14 | 2026-09-09 | 增加默认启动页面偏好、首屏前根路径替换、深链保护和延迟路由创建方案。 |
 | v0.15 | 2026-09-09 | 移除备份与恢复架构方案，将数据迁移和自定义数据库位置明确为非目标，并保留内部 schema migration。 |
 | v0.16 | 2026-09-09 | 记录离线 IPC、编辑快照、路由分包与错误边界、依赖门禁和用例拆分；校正权限、虚拟化及严格分层的实现状态。 |
+| v0.17 | 2026-09-09 | 记录纯 Domain 与批量事务端口落地、仓库治理门禁、四处版本与隔离签名流程，保留普通 CRUD 过渡边界。 |
