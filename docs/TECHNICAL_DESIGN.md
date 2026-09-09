@@ -3,10 +3,10 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active / Evolving |
-| 版本 | v0.18 |
+| 版本 | v0.19 |
 | 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame MVP |
-| 目标平台 | macOS |
+| 目标平台 | macOS arm64、Windows amd64、Linux amd64/arm64 |
 | 关联文档 | [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [开发规范](DEVELOPMENT_GUIDE.md) |
 
 ## 1. 文档目的
@@ -28,13 +28,13 @@
 - 所有写操作经过领域校验和 SQLite 事务。
 - 业务数据库固定由应用管理，升级时只执行受控的 schema migration。
 - 在 500 台机柜、10,000 台设备规模下保持可用。
-- 首期交付可签名、可公证的 macOS 安装包。
+- 通过 GitHub Release 提供四目标桌面安装包；dev 预发行与稳定 Draft 分开。
 
 ### 2.2 非目标
 
 - 不设计服务端、多用户、登录、权限和数据同步架构。
 - 不接入设备监控、自动发现、SSH 或其他远程执行能力。
-- 不设计 Windows、Linux 或移动端兼容层。
+- 不设计 Intel Mac、Windows arm64、32 位或移动端兼容层。
 - 不提供机柜背面、端口、线缆、电源链路和网络拓扑模型。
 - 不提供数据备份、跨安装或跨目录迁移、数据恢复及用户自定义业务数据库位置。
 
@@ -48,7 +48,7 @@
 | 包管理 | pnpm 11.10.0 | 已采用 | 由 `packageManager` 固定版本。 |
 | 工具链 | Node.js 24.20.0 + Rust 1.98.1 | 已采用 | 由 `.node-version` 和 `rust-toolchain.toml` 固定。 |
 | Rust | Rust 2024 edition | 已采用 | 当前 Cargo 工程配置。 |
-| 本地数据库 | SQLite | 已采用 | 数据文件位于 macOS 应用数据目录。 |
+| 本地数据库 | SQLite | 已采用 | 数据文件位于操作系统的应用数据目录。 |
 | SQLite 访问 | SQLx 0.9 SQLite | 已采用 | 异步访问与内嵌迁移，见 [ADR-001](adr/0001-sqlx-sqlite.md)。 |
 | 前端异步数据 | TanStack Query 5 | 已采用 | 管理 Tauri 查询缓存、失效和写后刷新。 |
 | 前端 UI 状态 | React local state | 已采用 | MVP 暂不引入全局状态库；出现跨页面状态后再评估 Zustand。 |
@@ -57,7 +57,7 @@
 | Excel 处理 | Rust 侧解析与生成 | 待 ADR | 解析、字段匹配和正式写入均留在可信后端。 |
 | IPC 类型共享 | tauri-specta 生成 TypeScript bindings | 已采用 | RC 版本精确锁定并由门禁检查漂移，见 [ADR-002](adr/0002-tauri-specta-bindings.md)。 |
 | 持续集成 | GitHub Actions macOS `quality-gate` | 已采用 | PR 和 `main` 使用同一 `pnpm gate`，见 [ADR-006](adr/0006-github-delivery-pipeline.md)。 |
-| macOS 发行 | Universal DMG + Developer ID + notarization | 已采用 | 发布 workflow 已建立，首个签名发行待 Apple 凭据和真实安装验收，见 [ADR-005](adr/0005-macos-universal-distribution.md)。 |
+| 桌面发行 | macOS arm64 / Windows amd64 / Linux amd64、arm64 | 已采用 | GitHub Release 安装包，无 Apple 公证，dev 预发行；真实安装验收单独记录，见 [ADR-008](adr/0008-platform-release-matrix.md)。 |
 
 任何“拟采用”或“待 ADR”条目都不代表依赖已经安装。
 
@@ -480,7 +480,7 @@ React WebView 输入、Excel 内容和用户选择的路径均视为不可信。
 
 ### 9.2 Tauri 能力最小化
 
-- Capability 仅绑定 `main` 窗口和 macOS。
+- Capability 仅绑定 `main` 窗口和 macOS、Windows、Linux 三个桌面系统。
 - 只启用实际需要的 dialog、文件读取或保存权限，并限制路径范围。
 - 当前仅启用 `core:default`，默认 opener 权限已移除；未使用的 dialog 和文件权限不提前开放。
 - 生产 CSP 已限制为本地资源与 Tauri IPC；开发 CSP 额外允许本地 Vite HTTP/WebSocket。具体配置以 `src-tauri/tauri.conf.json` 为准。
@@ -531,7 +531,7 @@ React WebView 输入、Excel 内容和用户选择的路径均视为不可信。
 - 画布、详情和带筛选列表发起的操作在取消或成功后恢复原任务上下文。
 - 上架与移动页的连续空闲范围、冲突设备和最终 U 位与 Rust 端校验结果一致。
 - 导入预览不会修改正式数据，应用后复核数量一致。
-- macOS 打包产物可启动、可创建数据库并可完成已实现的核心业务闭环。
+- 各目标平台打包产物可启动、可创建数据库并可完成已实现的核心业务闭环；按平台分别记录验收结果。
 
 ### 11.4 建议门禁
 
@@ -539,7 +539,7 @@ React WebView 输入、Excel 内容和用户选择的路径均视为不可信。
 pnpm gate
 ```
 
-当前 `pnpm gate` 执行 Git 空白、Shell 语法、根文件/工作流/架构政策、脚本反例、独立 Domain 编译、递归文档和双向追踪、四处应用版本、bindings、前端 ESLint、业务与配置 TypeScript、Vitest 与构建，以及 Rust 格式、Debug/Release Clippy 和全量测试。GitHub `quality-gate` 在 macOS runner 执行同一入口。Universal DMG、签名和公证属于发布门禁，不在每次提交时执行。治理控制及人工边界见 [仓库治理规范](REPOSITORY_GOVERNANCE.md)。
+当前 `pnpm gate` 执行 Git 空白、Shell 语法、根文件/工作流/架构政策、脚本反例、独立 Domain 编译、递归文档和双向追踪、四处应用版本、bindings、前端 ESLint、业务与配置 TypeScript、Vitest 与构建，以及 Rust 格式、Debug/Release Clippy 和全量测试。GitHub `quality-gate` 在 macOS runner 执行同一入口。四目标安装包、二进制架构和来源绑定摘要属于独立构建门禁，相关 PR 试构建通过后 tag 重建。治理控制及人工边界见 [仓库治理规范](REPOSITORY_GOVERNANCE.md)。
 
 ## 12. 日志与审计
 
@@ -550,48 +550,15 @@ pnpm gate
 - 每次写 Command 创建 `operationId`，贯穿应用服务、技术日志、错误响应和审计记录。
 - 日志级别至少包含 error、warn、info；生产环境默认不记录 SQL 参数和导入原文。
 
-## 13. macOS 构建与发布
+## 13. 桌面构建与发布
 
-开发阶段：
+采用 [ADR-008](adr/0008-platform-release-matrix.md) 的四目标原生构建矩阵。macOS arm64 生成 DMG（仅 ad-hoc 签名），Windows amd64 生成 NSIS EXE，Linux amd64/arm64 生成 DEB；不走应用商店或 Apple 公证。
 
-```bash
-pnpm install
-pnpm tauri dev
-```
+发布职责分离为只读来源/门禁验证、四个只读构建 job，以及仅在 tag 上运行的汇总发布 job。PR 运行相同试构建但不发布。四处版本、annotated tag、main 归属、二进制架构、DEB 架构字段和 manifest SHA 必须一致；汇总拒绝缺包、重复、符号链接、路径越界和摘要不匹配。
 
-发布阶段：
+严格匹配 dev.N 的 tag 自动创建非 latest Pre-release，稳定和其他后缀保持 Draft。自动构建不能证明实际安装体验，四平台人工安装和数据库/核心业务/主题回归需独立记录。当前未引入 AppImage、RPM、签名证书或自动升级。
 
-```bash
-pnpm install --frozen-lockfile
-pnpm gate
-pnpm release:build
-```
-
-已采用的发布链为：
-
-```text
-main 上的版本提交
-  → annotated SemVer tag
-    → GitHub release environment
-      → 完整门禁
-        → Universal app + DMG
-          → Developer ID 签名 + Apple notarization
-            → codesign / stapler / SHA-256 验证
-              → Draft Release
-                → Intel + Apple Silicon 安装验收
-                  → 人工发布
-```
-
-正式对外分发必须：
-
-- 四处应用版本（包含 Cargo.lock）与 tag 一致，tag 对应 `main` 中的不可变提交。
-- 使用 Developer ID Application 证书签名，完成 Apple notarization 和 staple 验证。
-- 使用 Universal Binary 同时支持 Apple Silicon 与 Intel，并分别完成真实安装启动验收。
-- 默认只读的独立 job 完成来源与完整门禁，签名发布 job 通过后才接续；Apple 凭据仅注入签名步骤。
-- 唯一 app/DMG 通过双架构、签名、Gatekeeper 和 staple 检查后原子生成 SHA-256；发布前重新核对当前 DMG，Draft 只上传验证制品。
-- 执行当前发布范围的数据库 schema migration、核心业务、主题和窗口回归；导入和审计上线后再加入必测矩阵。
-
-详细操作、凭据、故障与回滚见 [发布规范](RELEASING.md)；架构和流水线决策见 [ADR-005](adr/0005-macos-universal-distribution.md) 和 [ADR-006](adr/0006-github-delivery-pipeline.md)。
+操作步骤与兼容性见 [发布规范](RELEASING.md)。该决定替代原 Universal、Developer ID、公证方案；主线 PR/squash 与最小权限原则保留。
 
 ## 14. 实施顺序
 
@@ -602,15 +569,16 @@ main 上的版本提交
 5. 已实现网格多机柜画布、50%–160% 缩放、机柜顺序持久化和设备详情交互；虚拟化留待后续切片。
 6. 实现导入 staging、差异预览、确认应用和导出。
 7. 实现审计和数据库 schema 升级兼容测试。
-8. 已配置 GitHub 质量门禁和 macOS Universal 签名公证流水线；Apple 凭据配置和首个发行安装验收待执行。
+8. 已配置 GitHub 质量门禁与四目标 Release 构建；dev 预发行与各平台真实安装验收分别记录。
 
 ## 15. ADR 待办
 
 | ADR | 决策问题 | 候选方案 | 完成阶段 |
 |---|---|---|---|
 | ADR-004 | Excel 解析和生成库 | Rust 生态候选库实测比较 | M3 开始前 |
-| [ADR-005](adr/0005-macos-universal-distribution.md) | macOS 架构产物 | 采用 Universal app + DMG | 已完成 |
-| [ADR-006](adr/0006-github-delivery-pipeline.md) | GitHub 集成和发行流水线 | 主线 PR 门禁 + tag 驱动 Draft Release | 已完成 |
+| [ADR-005](adr/0005-macos-universal-distribution.md) | 原 macOS 架构产物 | 原 Universal app + DMG | 已由 ADR-008 替代 |
+| [ADR-006](adr/0006-github-delivery-pipeline.md) | GitHub 集成和发行流水线 | 主线 PR 门禁；发行部分见 ADR-008 | 部分被替代 |
+| [ADR-008](adr/0008-platform-release-matrix.md) | 四平台 Release 分发 | 原生安装包 + 来源摘要校验 + dev 预发行 | 已接受 |
 | [ADR-007](adr/0007-domain-and-transaction-ports.md) | 纯领域与事务端口 | 标准库 Domain + 应用层端口 + SQLite adapter，按用例渐进迁移 | 已完成（批量移动切片） |
 
 ## 16. 当前脚手架差距
@@ -623,7 +591,7 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 - Domain 已与 DTO/框架隔离，批量移动已通过应用层端口编排；普通 CRUD 和单设备放置仍有应用层 SQL，不能宣称全后端仓储化完成。
 - 未保存修改的跨页离开保护、数据库初始化失败的可操作界面仍需单独交付。
 - 本轮设计与代码评审、风险排序和验证记录见 [Iteration 013](iterations/0013-design-and-code-review.md)。
-- GitHub CI 和发布 workflow 已建立；Apple 签名凭据、首个 Draft Release 及 Intel/Apple Silicon 安装验收尚未执行。
+- 四目标发行 workflow 已建立；真实安装与图形界面体验按平台验收，构建通过不代表全部用户故事在新平台已验收。
 
 ## 17. 参考资料
 
@@ -662,3 +630,4 @@ Iteration 001 已移除默认示例并建立 SQLite、类型化 IPC、分层目�
 | v0.16 | 2026-09-09 | 记录离线 IPC、编辑快照、路由分包与错误边界、依赖门禁和用例拆分；校正权限、虚拟化及严格分层的实现状态。 |
 | v0.17 | 2026-09-09 | 记录纯 Domain 与批量事务端口落地、仓库治理门禁、四处版本与隔离签名流程，保留普通 CRUD 过渡边界。 |
 | v0.18 | 2026-09-09 | 采用 TypeScript 6，移除两套配置的 baseUrl，保留显式别名和 strict，并记录受控依赖集成。 |
+| v0.19 | 2026-09-09 | 采用四目标原生 GitHub Release 分发和 dev 通道，扩展桌面权限范围，撤销 Universal 与 Apple 签名公证要求。 |

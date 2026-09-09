@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.4 |
+| 版本 | v1.5 |
 | 更新日期 | 2026-09-09 |
 | 适用范围 | UFrame 全部代码、文档和配置变更 |
 | 关联文档 | [项目协作指南](../AGENTS.md) · [产品需求文档](PRD.md) · [用户故事](USER_STORIES.md) · [技术设计](TECHNICAL_DESIGN.md) |
@@ -305,7 +305,7 @@ GitHub [CI workflow](../.github/workflows/ci.yml) 在 Pull Request、`main` push
 
 ## 10. 发布门禁
 
-提交门禁不等于发布验证。本地可构建 Universal 候选包：
+提交门禁不等于发布验证。本地可构建当前平台候选包：
 
 ```bash
 pnpm install --frozen-lockfile
@@ -313,7 +313,7 @@ pnpm gate
 pnpm release:build
 ```
 
-正式发行必须从 `main` 中的 annotated SemVer tag 触发 [Release workflow](../.github/workflows/release.yml)，完成 Universal 构建、Developer ID 签名、Apple notarization、staple 验证、SHA-256 摘要和 Draft Release 安装验收。详细步骤见 [发布规范](RELEASING.md)。
+发布从 `main` 中的 annotated SemVer tag 触发 [Release workflow](../.github/workflows/release.yml)，完成四目标原生构建、架构/来源/摘要及完整集合验证；dev.N 自动预发行，稳定与其他版本为 Draft。PR 试构建无写权限且不发布。详细平台、无证书签名的安全提示及人工验收见 [发布规范](RELEASING.md)。
 
 ## 11. 变更记录
 
@@ -324,3 +324,4 @@ pnpm release:build
 | v1.2 | 2026-09-04 | 修正前端 lint、测试和 Rust 测试已纳入门禁的当前状态。 |
 | v1.3 | 2026-09-07 | 记录 GitHub 远程、CI required check、版本一致性门禁和 macOS Universal 签名公证发布流程。 |
 | v1.4 | 2026-09-09 | 对齐实际门禁顺序，增加治理/脚本/领域隔离/配置类型检查，明确工具链证据与文档提交纪律。 |
+| v1.5 | 2026-09-09 | 按用户决定采用 macOS arm64、Windows amd64、Linux amd64/arm64 GitHub Release 分发，撤销原 Apple Universal 签名公证要求。 |

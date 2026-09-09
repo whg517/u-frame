@@ -1,7 +1,7 @@
 [package]
 name = "u-frame"
-version = "0.1.0"
-description = "Local rack and physical asset management for macOS"
+version = "0.1.0-dev.1"
+description = "Local rack and physical asset management for desktop"
 authors = ["UFrame contributors"]
 edition = "2024"
 

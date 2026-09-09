@@ -1,7 +1,7 @@
 {
   "name": "u-frame",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-dev.1",
   "packageManager": "pnpm@11.10.0",
   "type": "module",
   "engines": {
@@ -21,8 +21,8 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
-    "release:build": "pnpm version:check && pnpm tauri build --target universal-apple-darwin --bundles app,dmg",
-    "release:verify": "bash scripts/verify-macos-release.sh",
+    "release:build": "pnpm version:check && tauri build",
+    "release:verify": "node scripts/release-artifacts.mjs verify",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",

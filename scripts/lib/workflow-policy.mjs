@@ -1,3 +1,5 @@
+import { targets } from "./release-policy.mjs"
+
 export function workflowErrors(name, workflow) {
   const errors = []
   const fail = (message) => errors.push(`${name}: ${message}`)
@@ -8,21 +10,21 @@ export function workflowErrors(name, workflow) {
   if (workflow.permissions?.contents !== "read" || Object.values(workflow.permissions ?? {}).some((p) => p === "write")) fail("workflow must default to read-only")
   if (hasSecrets(workflow.env)) fail("workflow-level secrets are forbidden")
   for (const [id, job] of Object.entries(workflow.jobs ?? {})) {
-    const signing = name === "release.yml" && id === "macos-universal"
+    const publishing = name === "release.yml" && id === "publish"
     if (!Number.isInteger(job["timeout-minutes"]) || job["timeout-minutes"] < 1) fail(`${id}: finite timeout is required`)
     if (hasSecrets(job.env)) fail(`${id}: job-level secrets are forbidden`)
     if (job["continue-on-error"]) fail(`${id}: job failure must not be ignored`)
     if (typeof job.permissions === "string") fail(`${id}: permissions must be explicit`)
     for (const [permission, level] of Object.entries(job.permissions ?? {})) {
-      if (level === "write" && !(signing && permission === "contents")) fail(`${id}: unexpected write permission`)
+      if (level === "write" && !(publishing && permission === "contents")) fail(`${id}: unexpected write permission`)
     }
     for (const step of job.steps ?? []) {
       if (step.uses && !/^[\w-]+\/[\w-]+(?:\/[\w/-]+)?@[a-f0-9]{40}$/.test(step.uses)) fail(`${id}: Action must pin a full SHA`)
       if (step.uses?.startsWith("actions/checkout@") && step.with?.["persist-credentials"] !== false) fail(`${id}: checkout must disable credential persistence`)
       if (step.uses?.startsWith("pnpm/action-setup@") && step.with?.version) fail("pnpm version must come from packageManager")
       if (step.run?.includes("${{")) fail(`${id}: expressions must enter scripts through env, not run interpolation`)
-      if (hasSecrets(step) && !(signing && step.id === "signed_build")) fail(`${id}: secrets only belong to signed_build`)
-      if (/github\.token/.test(JSON.stringify(step.env ?? {})) && !(signing && step.id === "publish")) fail(`${id}: token only belongs to publish`)
+      if (hasSecrets(step)) fail(`${id}: release no longer uses external signing secrets`)
+      if (/github\.token/.test(JSON.stringify(step.env ?? {})) && !(publishing && step.id === "publish")) fail(`${id}: token only belongs to publish`)
     }
   }
   if (name === "ci.yml") {
@@ -32,18 +34,26 @@ export function workflowErrors(name, workflow) {
   }
   if (name === "release.yml") {
     const verify = workflow.jobs?.["verify-source"]
-    const signing = workflow.jobs?.["macos-universal"]
-    if (events.length !== 1 || events[0] !== "push" || !workflow.on.push.tags?.length || workflow.on.push.branches) fail("release must be tag-only")
-    if (!mandatory(verify, "pnpm gate") || !mandatory(verify, "bash scripts/check-release-source.sh") || verify.if !== undefined) fail("release source and gate verification are required")
-    if (signing?.needs !== "verify-source" || signing.environment !== "release") fail("signing must depend on isolated source verification and use release environment")
-    if (!signing?.steps?.some((s) => s.id === "signed_build" && s.run === "bash scripts/build-signed-release.sh")) fail("signed build entry is required")
-    const verifyIndex = signing?.steps?.findIndex((s) => s.run?.startsWith("pnpm release:verify")) ?? -1
-    const publishIndex = signing?.steps?.findIndex((s) => s.id === "publish") ?? -1
-    if (verifyIndex < 0 || publishIndex <= verifyIndex) fail("artifact verification must precede publish")
-    for (const index of [verifyIndex, publishIndex]) {
-      const step = signing?.steps?.[index]
-      if (step && (step.if !== undefined || step["continue-on-error"])) fail("verification and publishing must use normal success conditions")
-    }
+    const build = workflow.jobs?.build
+    const publish = workflow.jobs?.publish
+    const tagOnly = "startsWith(github.ref, 'refs/tags/v')"
+    if (events.some((event) => !["push", "pull_request"].includes(event)) ||
+        !workflow.on.push?.tags?.includes("v*.*.*") || workflow.on.push.branches ||
+        !workflow.on.pull_request?.branches?.includes("main")) fail("release supports main PR validation and version tags only")
+    if (!mandatory(verify, "pnpm gate") || verify.if !== undefined) fail("unconditional isolated gate is required")
+    if (!verify?.steps?.some((s) => s.run === "bash scripts/check-release-source.sh" && s.if === tagOnly && !s["continue-on-error"])) fail("tag ancestry and version verification are required")
+    if (build?.needs !== "verify-source" || build.if !== undefined || build.strategy?.["fail-fast"] !== false) fail("all builds must follow source verification")
+    const expected = targets.map(({ id, runner, target, bundles }) => ({ id, runner, target, bundles }))
+    if (JSON.stringify(build?.strategy?.matrix?.include) !== JSON.stringify(expected)) fail("exact four-platform native build matrix is required")
+    if (!mandatory(build, "cargo test --locked --manifest-path src-tauri/Cargo.toml --all-targets") ||
+        !mandatory(build, 'pnpm tauri build --target "$RUST_TARGET" --bundles "$BUNDLES"')) fail("native tests and builds are required")
+    if (publish?.if !== tagOnly || JSON.stringify(publish.needs) !== JSON.stringify(["verify-source", "build"])) fail("publish must be tag-only and depend on every build")
+    if (!mandatory(publish, "bash scripts/check-release-source.sh") ||
+        !mandatory(publish, 'node scripts/publish-release.mjs "$RUNNER_TEMP/packages"')) fail("verified publishing entry and source recheck are required")
+    const upload = build?.steps?.find((s) => s.uses?.startsWith("actions/upload-artifact@"))
+    if (!upload || upload.if !== undefined || upload["continue-on-error"] || upload.with?.["if-no-files-found"] !== "error") fail("missing packages must fail upload")
+    const collect = build?.steps?.find((s) => s.run?.includes("node scripts/release-artifacts.mjs collect"))
+    if (!collect || collect.if !== undefined || collect["continue-on-error"] || build.steps.indexOf(collect) >= build.steps.indexOf(upload)) fail("package validation must precede upload")
   }
   return errors
 }

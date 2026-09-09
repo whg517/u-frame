@@ -3,132 +3,100 @@
 | 属性 | 内容 |
 |---|---|
 | 文档状态 | Active |
-| 版本 | v1.1 |
+| 版本 | v2.0 |
 | 更新日期 | 2026-09-09 |
-| 适用范围 | GitHub Release 分发的 macOS Universal DMG |
-| 关联文档 | [开发规范](DEVELOPMENT_GUIDE.md) · [GitHub 治理](GITHUB_GOVERNANCE.md) · [技术设计](TECHNICAL_DESIGN.md) · [变更记录](../CHANGELOG.md) |
+| 适用范围 | GitHub Release 桌面安装包 |
+| 关联文档 | [开发规范](DEVELOPMENT_GUIDE.md) · [GitHub 治理](GITHUB_GOVERNANCE.md) · [ADR-008](adr/0008-platform-release-matrix.md) · [变更记录](../CHANGELOG.md) |
 
-## 1. 发布原则
+## 1. 分发边界
 
-- Sprint、合并和发布不是一一对应关系；`main` 可以持续集成，只有经过验收的版本才创建 Release。
-- 正式发行使用 SemVer tag `vMAJOR.MINOR.PATCH`；预发行允许 `vMAJOR.MINOR.PATCH-rc.N`。
-- 应用版本、Git tag、完整 Git SHA、DMG 文件和 SHA-256 摘要必须可相互追踪。
-- 同一 tag 只对应一组最终候选制品；需要代码修正时提升版本并创建新 tag。未生成可用 Draft 的外部服务短暂故障允许原源码重试，不移动 tag 或覆盖已经发布的资产。
-- 自动化只创建 Draft Release；维护者完成安装验收后人工发布。
-- 对外 DMG 必须使用 Developer ID Application 签名并完成 Apple notarization，不提供静默降级的未签名正式包。
+根据 2026-09-09 的产品决定，不上架 Apple App Store，不使用 Developer ID、Apple notarization 或 Windows Authenticode 凭据。安装包直接由当前 GitHub 仓库的 Release 分发；仓库保持 Private，下载者需要仓库访问权。
 
-## 2. 固定构建基线
+macOS 使用无需账号的 ad-hoc 签名，保证 Apple Silicon 包的基本代码完整性；它不是发行者认证，不满足 Apple 公证或 Gatekeeper 信任要求。Windows 同样可能显示 SmartScreen 提示。不得描述为“官方认证”“免警告安装”。
 
-| 项目 | 基线 |
-|---|---|
-| 操作系统 | GitHub hosted `macos-15` |
-| Node.js | `.node-version` 中的 24.20.0 |
-| pnpm | `package.json#packageManager` 中的 11.10.0 |
-| Rust | `rust-toolchain.toml` 中的 1.98.1 |
-| Rust targets | `aarch64-apple-darwin`、`x86_64-apple-darwin` |
-| 产物 | 一个 Universal `.app` 和一个 Universal `.dmg` |
-| 包依赖 | `pnpm-lock.yaml`、`src-tauri/Cargo.lock` |
+dev 是预发行通道，不是 Rust Debug profile：使用优化 Release 构建，不注册加载开发数据命令。正式稳定版本仍需人工验收，不自动公开。
 
-升级构建基线必须通过独立 PR，并同时更新工作流、文档和本地验证证据。
+## 2. 唯一支持矩阵
 
-## 3. GitHub Release 环境
+| 平台 | 架构 | Rust target | 原生运行器 | 安装包 |
+|---|---|---|---|---|
+| macOS | arm64 | aarch64-apple-darwin | macos-15 | DMG |
+| Windows | amd64 | x86_64-pc-windows-msvc | windows-2022 | NSIS EXE |
+| Linux | amd64 | x86_64-unknown-linux-gnu | ubuntu-24.04 | DEB |
+| Linux | arm64 | aarch64-unknown-linux-gnu | ubuntu-24.04-arm | DEB |
 
-在 GitHub `release` environment 中配置以下 secrets：
+不构建 Intel Mac、Windows arm64、32 位或移动端。Linux 首版覆盖 Ubuntu 24.04 基线及满足包依赖的兼容系统；DEB 不代表所有 Linux 发行版通用。安装使用系统包管理器解析依赖，例如 sudo apt install ./UFrame_VERSION_linux-amd64.deb。Windows 需要 WebView2，安装器使用 Tauri 默认引导方式。
 
-| Secret | 用途 |
-|---|---|
-| `APPLE_CERTIFICATE` | Base64 编码的 Developer ID Application `.p12` |
-| `APPLE_CERTIFICATE_PASSWORD` | `.p12` 导出密码 |
-| `APPLE_SIGNING_IDENTITY` | Developer ID Application identity |
-| `APPLE_ID` | notarization 使用的 Apple ID |
-| `APPLE_PASSWORD` | Apple app-specific password |
-| `APPLE_TEAM_ID` | Apple Developer Team ID |
+Node.js、Rust 和 pnpm 分别由 .node-version、rust-toolchain.toml 和 packageManager 固定；依赖使用锁文件。GitHub 当前支持 Private 仓库的 Ubuntu arm64 标准运行器，不需要更改可见性或启用付费大型运行器。
 
-只在 environment 中保存凭据，不写入仓库、Issue、PR、日志或普通 Actions variable。证书更新、成员离职、泄露怀疑或 Apple 凭据变化时立即轮换，并以一次不发布的候选验证新凭据。
+## 3. 版本和来源
 
-## 4. 准备发布候选
+- 第一版开发候选为 0.1.0-dev.1；后续使用唯一递增的 dev.N（N 从 1 开始）。
+- package.json、Cargo.toml、Cargo.lock、tauri.conf.json 四处版本必须一致。
+- Tag 必须为 main 上提交的 annotated vMAJOR.MINOR.PATCH[-suffix]，不可移动、覆盖或重用已经发布的版本。
+- 只有严格匹配 vMAJOR.MINOR.PATCH-dev.N 的版本自动发布为 Pre-release，latest=false。
+- rc、beta 和稳定 tag 只创建 Draft，后续人工验收和发布。
+- 版本、完整 Git SHA、四个架构包及 SHA-256 必须可互相追踪。
 
-1. 建立发布 Issue，冻结范围、已知限制和验收负责人。
-2. 更新 `package.json`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 为同一 SemVer；执行 `cargo check` 更新 `Cargo.lock` 中的包版本。
-3. 把“未发布”内容整理为版本条目，记录日期、用户可见变化、数据库 schema migration 和兼容性。
-4. 执行 `pnpm version:check` 和 `pnpm gate`，在真实 Tauri 窗口中完成发布范围验收。
-5. 通过 Pull Request squash 合并到 `main`，等待 `quality-gate` 成功。
-6. 在最新本地 `main` 创建 annotated tag，并仅推送该 tag：
+## 4. 准备与触发
+
+1. 建立发布 Issue，记录版本、范围、已知限制和验收负责人。
+2. 独立 worktree 更新四处版本、CHANGELOG；运行 cargo check 更新锁文件。
+3. 运行完整 pnpm gate，通过 PR 和四平台试构建后 squash 合并 main。
+4. 等待 main CI 通过，在干净 main 再执行版本检查和完整门禁。
+5. 创建并仅推送这一 annotated tag：
 
 ```bash
-git fetch origin
-git switch main
-git pull --ff-only origin main
-pnpm version:check
-pnpm gate
-git tag -a v0.1.0 -m "UFrame v0.1.0"
-git push origin v0.1.0
+git tag -a v0.1.0-dev.1 -m "UFrame v0.1.0-dev.1"
+git push origin v0.1.0-dev.1
 ```
 
-如果项目启用签名 Git tag，则在上述流程中使用已配置的签名方式；不得为了赶发布关闭 tag 验证。
+创建 tag 本身不是发行成功；必须等待 Release workflow 和资产复核完成。PR 上的试构建仅产生保留 7 天的 Actions artifacts，不发布 Release。
 
-## 5. 自动构建流程
+## 5. 自动执行与权限
 
-Tag push 触发 [Release workflow](../.github/workflows/release.yml)：
+[Release workflow](../.github/workflows/release.yml) 使用分离职责：
 
-1. 在独立只读 verify-source job 确认四处应用版本（含 Cargo.lock）与 tag 一致，tag 是 annotated tag 且目标提交属于 origin/main。
-2. 读取仓库工具链文件，安装锁定依赖，执行完整 pnpm gate；本 job 不使用发布 environment。
-3. 成功后在新的签名 runner 重新检出并检查同一来源，安装工具链与依赖。
-4. 只在 signed_build 步骤注入并检查六项 Apple secrets，再为 Intel 和 Apple Silicon 构建 Universal app/DMG，完成签名与 notarization。
-5. 拒绝缺少或多份候选 app/DMG；读取 app 的 CFBundleExecutable，使用 lipo 检查 arm64 与 x86_64。
-6. codesign 验证 app 与 DMG 签名；spctl 检查 app Gatekeeper；xcrun stapler 验证 app 与 DMG 的 ticket。全部成功后原子写入 SHA256SUMS。
-7. publish 步骤仅接收 GitHub token，再次计算当前唯一 DMG 摘要并与验证文件精确比对，然后创建 Draft；预发行 tag 标记 prerelease。
+1. verify-source：只读 macOS job，tag 事件检查版本、annotated tag、main 归属，执行完整 pnpm gate。
+2. build：四个只读原生 job；Linux 安装 Tauri 系统依赖，各目标运行 Rust 测试、优化构建，检查可执行文件 Mach-O/PE/ELF 架构，Linux 额外检查 DEB Architecture，macOS 验证 ad-hoc 代码签名。
+3. 每个目标必须且只能有一个安装包；写入源码绑定的 manifest 后上传当前 run 的隔离 artifact。
+4. publish：仅 tag 事件且四个 build 全部成功才运行；仅本 job 获得 contents: write，GitHub token 仅注入 publish 步骤。不使用 Apple secrets 或发布 environment。
+5. 发布入口重新校验 tag，下载本 run 的四个 artifact，拒绝缺包、多包、符号链接、路径越界、版本/源码/目标不一致和摘要错误。全部通过后生成 SHA256SUMS 与 release-manifest.json，再创建 Release。
+6. 先创建 Draft 并上传所有文件，再读取 GitHub 资产列表核对名称、数量、大小、上传完成状态与服务端 SHA-256；通过后 dev.N 转为可下载 Pre-release，其余保持 Draft。任何失败保留 Draft，不覆盖已有 Release 或资产。
 
-任一步失败都不得人工上传同名“临时修复包”冒充流水线产物。修复代码或配置后创建新版本 tag；如果只是可重试的 GitHub/Apple 短暂故障，可以在不改变源码和 tag 的前提下重跑失败 job。
+外部 Action 固定完整 SHA。包不带业务数据库、密钥、用户日志；不改数据库路径，也不实现跨安装数据迁移。
 
-## 6. Draft Release 验收
+## 6. 下载与验收
 
-维护者从 Draft Release 下载 DMG，而不是直接使用 CI 工作目录，并完成：
+标准文件名：UFrame_VERSION_PLATFORM-ARCH.EXT，另附 SHA256SUMS 与 release-manifest.json。必须从 GitHub Release 重新下载，而非直接信任构建目录。
 
-- `shasum -a 256` 与 `SHA256SUMS` 一致。
-- DMG 可以挂载，应用可拖入 `/Applications`。
-- Gatekeeper 不显示未签名或来源损坏警告。
-- Intel 与 Apple Silicon 至少各完成一次安装启动；条件不足时不得宣称双架构已验收。
-- 空库首次启动、数据库 schema migration、应用重启和已实现的核心业务闭环通过。
-- 深色和浅色模式、最小窗口尺寸、关键画布交互无阻断问题。
-- Release notes、版本号、已知限制、下载文件名和摘要正确。
-- 当 Excel 导入导出或审计进入该版本范围后，必须增加相应真实文件和操作记录验收。
+- 核对 tag、manifest commit 和每个下载文件的 SHA-256。
+- 验证安装包架构、安装、启动和卸载路径；不能只靠文件名判断架构。
+- 检查空库启动、位置/机柜/设备创建、上架与画布、持久化和重启。
+- 检查系统主题、两种语言、窗口尺寸与关键鼠标/键盘交互。
+- macOS/Windows 的未认证提示属于已知分发限制；不要建议关闭系统级安全防护。
+- Linux 记录实际发行版、图形环境和 WebKitGTK 版本。
+- 自动化测试/构建通过不等于四平台人工安装和交互验收；未执行的项目必须标注未验收。
 
-验收证据记录在发布 Issue。全部通过后由维护者发布 Draft Release；若仓库启用了 Immutable Releases，发布后不得替换 tag 或资产。
+正式 Draft 需完成上述验收才能人工发布。dev 包可以提前供测试，但 Release notes 必须说明未完成项和未签名/未公证属性。
 
-## 7. 本地候选构建
+## 7. 失败与回滚
 
-本地可用于提前发现 Universal 构建问题，但不能替代 GitHub 签名发行：
+任何目标失败都不会发布不完整 Release。未产生 Release 时，网络或托管服务瞬时故障可以重跑原 run；代码修复必须通过新 PR，不移动已推送 tag。已有 Release 时禁止上传覆盖同名资产，使用新的 dev.N。
 
-```bash
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-pnpm install --frozen-lockfile
-pnpm gate
-pnpm release:build
-```
+发布脚本不改业务数据。旧应用回退不等于数据库回滚；先检查 schema 兼容性。产品不提供备份、迁移和恢复功能。
 
-只有配置了正式 Apple 凭据且 `pnpm release:verify` 通过的本地产物，才具备与发布候选相同的签名属性；本地文件不得手工替换流水线 Draft Release 中的资产。
+## 8. 官方依据
 
-## 8. 故障与回滚
+- [Tauri GitHub 构建](https://v2.tauri.app/distribute/pipelines/github/)
+- [Tauri 系统前置依赖](https://v2.tauri.app/start/prerequisites/)
+- [Tauri macOS ad-hoc 签名](https://v2.tauri.app/distribute/sign/macos/)
+- [GitHub 标准运行器矩阵](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
-- Draft 未发布：保留失败证据，关闭错误 Draft；修复后使用新版本 tag 重建。
-- 已发布但应用有缺陷：停止推广，创建修复版本；不可变 Release 不覆盖原资产。
-- 数据库 migration 只允许向前演进。应用版本回滚不等于数据库回滚，必须先验证旧版本能否读取新 schema。
-- 发现证书或凭据泄露：立即撤销/轮换，暂停 Release workflow，评估已发布制品并发布安全公告。
-- GitHub 或 Apple 服务不可用：不绕过签名、公证和验证门禁，等待恢复后重跑。
-
-## 9. 主要依据
-
-- [Tauri GitHub Actions 发布指南](https://v2.tauri.app/distribute/pipelines/github/)
-- [Tauri macOS 代码签名](https://v2.tauri.app/distribute/sign/macos/)
-- [GitHub Actions 安全加固](https://docs.github.com/en/code-security/tutorials/secure-your-organization/protect-against-threats)
-- [GitHub Immutable Releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
-- [GitHub Actions 安全使用](https://docs.github.com/en/actions/reference/security/secure-use)
-- [Apple Universal 二进制](https://developer.apple.com/documentation/apple-silicon/building-a-universal-macos-binary)
-
-## 10. 变更记录
+## 9. 变更记录
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
-| v1.0 | 2026-09-07 | 建立 macOS Universal 签名公证与 Draft 安装验收流程。 |
-| v1.1 | 2026-09-09 | 分离来源验证与签名，明确唯一制品、双架构、双签名和发布前摘要复核，澄清不可变 tag 重试边界。 |
+| v1.0 | 2026-09-07 | 建立原 macOS Universal 签名公证流程。 |
+| v1.1 | 2026-09-09 | 隔离来源验证、签名与摘要复核。 |
+| v2.0 | 2026-09-09 | 按用户决定替换为四平台 GitHub Release 安装包，dev 自动预发行、其余 Draft，撤销 Apple 凭据要求。 |

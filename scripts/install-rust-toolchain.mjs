@@ -12,9 +12,6 @@ if (!profile || !Array.isArray(components) || !components.every((c) => typeof c 
 const commands = [
   ["toolchain", "install", channel, "--profile", profile, "--component", components.join(",")],
 ]
-if (process.argv.includes("--universal")) {
-  commands.push(["target", "add", "aarch64-apple-darwin", "x86_64-apple-darwin", "--toolchain", channel])
-}
 for (const args of commands) {
   const result = spawnSync("rustup", args, { stdio: "inherit", cwd: root })
   if (result.error) throw result.error

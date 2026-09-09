@@ -13,6 +13,8 @@ git diff --check
 git diff --cached --check
 
 printf '%s\n' '[gate] shell syntax'
+# Some releases have no Shell helpers under lib; unmatched globs are not files.
+shopt -s nullglob
 for gate_shell in scripts/*.sh scripts/lib/*.sh .githooks/pre-commit; do
   bash -n "${gate_shell}"
 done

@@ -33,5 +33,5 @@ body:
     attributes:
       label: 范围确认
       options:
-        - label: 该建议与 macOS 本地、单用户、离线优先的产品定位一致。
+        - label: 该建议与本地桌面、单用户、离线优先的产品定位一致。
           required: true

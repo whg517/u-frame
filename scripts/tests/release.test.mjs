@@ -1,116 +1,215 @@
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import test from "node:test"
+import { parse } from "yaml"
+import { collect, verify } from "../release-artifacts.mjs"
+import { assetName, devPublishArgs, digest, findDraftRelease, publishArgs, targets, verifyBinary, verifyUploadedAssets } from "../lib/release-policy.mjs"
 
 const root = resolve(import.meta.dirname, "../..")
-const releaseTag = `v${JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version}`
-function fixture(t) {
+const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version
+const commit = "a".repeat(40)
+
+function directory(t) {
   const path = mkdtempSync(join(tmpdir(), "uframe-release-test-"))
   t.after(() => rmSync(path, { recursive: true, force: true }))
-  const bundle = join(path, "bundle with spaces")
-  const app = join(bundle, "macos/UFrame.app")
-  const dmg = join(bundle, "dmg/UFrame universal.dmg")
-  const bin = join(path, "bin")
-  mkdirSync(join(app, "Contents/MacOS"), { recursive: true })
-  mkdirSync(join(bundle, "dmg"))
-  mkdirSync(bin)
-  writeFileSync(dmg, "fixture, not an installable DMG")
-  writeFileSync(join(app, "Contents/Info.plist"), '<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>u-frame</string></dict></plist>')
-  writeFileSync(join(app, "Contents/MacOS/u-frame"), "fixture")
-  const log = join(path, "calls")
-  for (const command of ["lipo", "codesign", "spctl", "xcrun", "gh", "git", "pnpm"]) {
-    writeFileSync(join(bin, command), `#!/usr/bin/env bash
-set -eu
-printf '%s\\n' "${command} $*" >> "$TEST_LOG"
-if [[ "${command}" == "${"$"}{TEST_FAIL:-}" ]]; then exit 9; fi
-if [[ "${command}" == git ]]; then
-  case "$1" in
-    cat-file) printf '%s\\n' "${"$"}{TEST_TAG_TYPE:-tag}" ;;
-    rev-parse)
-      if [[ "$2" == refs/tags/* ]]; then printf '%s\\n' commit
-      else printf '%s\\n' "${"$"}{TEST_EVENT_COMMIT:-commit}"; fi ;;
-    merge-base) exit "${"$"}{TEST_ANCESTOR_EXIT:-0}" ;;
-  esac
-fi
-`, { mode: 0o755 })
-  }
-  return {
-    path, bundle, app, dmg, log, checksum: join(path, "SHA256SUMS"),
-    run(script, args = [], extraEnv = {}) {
-      return spawnSync("bash", [resolve(root, "scripts", script), ...args], {
-        cwd: root, encoding: "utf8",
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TEST_LOG: log, GH_TOKEN: "fixture-only", GITHUB_REF_NAME: releaseTag, GITHUB_SHA: "commit", ...extraEnv },
-      })
-    },
-  }
+  return path
 }
 
-test("artifact resolver fails closed for missing or ambiguous output", (t) => {
-  const f = fixture(t)
-  rmSync(f.dmg)
-  assert.notEqual(f.run("verify-macos-release.sh", [f.bundle, f.checksum]).status, 0)
-  writeFileSync(f.dmg, "fixture")
-  copyFileSync(f.dmg, join(f.bundle, "dmg/duplicate.dmg"))
-  assert.notEqual(f.run("verify-macos-release.sh", [f.bundle, f.checksum]).status, 0)
-  assert.equal(existsSync(f.log), false)
+function binary(id) {
+  const bytes = Buffer.alloc(256)
+  if (id === "macos-arm64") {
+    bytes.writeUInt32LE(0xfeedfacf, 0)
+    bytes.writeUInt32LE(0x0100000c, 4)
+  } else if (id === "windows-amd64") {
+    bytes.write("MZ")
+    bytes.writeUInt32LE(128, 0x3c)
+    bytes.writeUInt32LE(0x00004550, 128)
+    bytes.writeUInt16LE(0x8664, 132)
+  } else {
+    Buffer.from("7f454c46", "hex").copy(bytes)
+    bytes[4] = 2
+    bytes[5] = 1
+    bytes.writeUInt16LE(id === "linux-amd64" ? 62 : 183, 18)
+  }
+  return bytes
+}
+
+function fixture(t) {
+  const path = directory(t)
+  const input = join(path, "packages")
+  const output = join(path, "verified")
+  for (const target of targets) {
+    const folder = join(input, target.id)
+    mkdirSync(folder, { recursive: true })
+    const name = assetName(target, version)
+    writeFileSync(join(folder, name), `fixture package ${target.id}`)
+    writeFileSync(join(folder, "manifest.json"), JSON.stringify({
+      schemaVersion: 1, version, commit, id: target.id, target: target.target, name, ...digest(join(folder, name)),
+    }))
+  }
+  return { path, input, output }
+}
+
+test("binary verification accepts only the declared native architecture", () => {
+  for (const target of targets) {
+    assert.doesNotThrow(() => verifyBinary(binary(target.id), target.id))
+    for (const other of targets.filter((item) => item.id !== target.id)) {
+      assert.throws(() => verifyBinary(binary(other.id), target.id), /architecture/)
+    }
+    assert.throws(() => verifyBinary(Buffer.alloc(10), target.id), /architecture/)
+  }
+  const corrupt = binary("windows-amd64")
+  corrupt.writeUInt32LE(0xffffffff, 0x3c)
+  assert.throws(() => verifyBinary(corrupt, "windows-amd64"), /architecture/)
 })
 
-test("verifier checks Universal, app and DMG signatures, Gatekeeper and both tickets before checksum", { skip: process.platform !== "darwin" }, (t) => {
-  const f = fixture(t)
-  const result = f.run("verify-macos-release.sh", [f.bundle, f.checksum])
-  assert.equal(result.status, 0, result.stderr)
-  const calls = readFileSync(f.log, "utf8").trim().split("\n")
-  assert.match(calls[0], /^lipo -verify_arch arm64 x86_64 /)
-  assert.match(calls[1], /^codesign .*UFrame.app$/)
-  assert.match(calls[2], /^codesign .*UFrame universal.dmg$/)
-  assert.match(calls[3], /^spctl --assess /)
-  assert.match(calls[4], /^xcrun stapler validate .*UFrame.app$/)
-  assert.match(calls[5], /^xcrun stapler validate .*UFrame universal.dmg$/)
-  assert.match(readFileSync(f.checksum, "utf8"), /^[a-f0-9]{64} {2}UFrame universal.dmg\n$/)
+test("collection rejects missing or ambiguous packages and mismatched executable", (t) => {
+  const path = directory(t)
+  const bundle = join(path, "bundle")
+  mkdirSync(join(bundle, "dmg"), { recursive: true })
+  const executable = join(path, "u-frame")
+  writeFileSync(executable, binary("macos-arm64"))
+  const output = join(path, "out")
+  const run = () => collect("macos-arm64", bundle, executable, output, version, commit)
+  assert.throws(run, /Exactly one/)
+  writeFileSync(join(bundle, "dmg/first.dmg"), "fixture")
+  writeFileSync(join(bundle, "dmg/second.dmg"), "fixture")
+  assert.throws(run, /Exactly one/)
+  rmSync(join(bundle, "dmg/second.dmg"))
+  writeFileSync(executable, binary("linux-arm64"))
+  assert.throws(run, /architecture/)
+  writeFileSync(executable, binary("macos-arm64"))
+  run()
+  assert.equal(JSON.parse(readFileSync(join(output, "manifest.json"), "utf8")).commit, commit)
+  assert.throws(run, /empty/)
 })
 
-test("any verification failure prevents new checksum generation", { skip: process.platform !== "darwin" }, (t) => {
+test("macOS collection verifies the final mounted DMG and detaches on failure", (t) => {
+  const path = directory(t)
+  const bin = join(path, "bin")
+  const dmg = join(path, "src-tauri/target/aarch64-apple-darwin/release/bundle/dmg")
+  mkdirSync(bin)
+  mkdirSync(dmg, { recursive: true })
+  writeFileSync(join(dmg, "UFrame.dmg"), "fixture")
+  const log = join(path, "calls")
+  for (const name of ["hdiutil", "codesign", "node"]) {
+    writeFileSync(join(bin, name), `#!/usr/bin/env bash
+printf '%s %s\\n' '${name}' "$*" >> "$TEST_LOG"
+if [[ '${name}' == codesign ]]; then exit "\${TEST_SIGNATURE_EXIT:-0}"; fi
+`, { mode: 0o755 })
+  }
+  const workflow = parse(readFileSync(join(root, ".github/workflows/release.yml"), "utf8"))
+  const script = workflow.jobs.build.steps.find((step) => step.name === "Validate and collect package").run
+  const run = (signatureExit) => spawnSync("bash", ["-e", "-o", "pipefail", "-c", script], {
+    cwd: path, encoding: "utf8", env: { ...process.env, PATH: `${bin}:${process.env.PATH}`,
+      TEST_LOG: log, TEST_SIGNATURE_EXIT: signatureExit, RUNNER_TEMP: path,
+      RELEASE_TARGET: "macos-arm64", RUST_TARGET: "aarch64-apple-darwin" },
+  })
+  assert.equal(run("0").status, 0)
+  const calls = readFileSync(log, "utf8").trim().split("\n")
+  assert.equal(calls.length, 4)
+  assert.match(calls[0], /^hdiutil attach -readonly -nobrowse -mountpoint /)
+  assert.match(calls[1], /^codesign --verify --deep --strict .*uframe-dmg\..*\/UFrame.app$/)
+  assert.match(calls[2], /uframe-dmg\..*\/UFrame.app\/Contents\/MacOS\/u-frame/)
+  assert.match(calls[3], /^hdiutil detach /)
+  writeFileSync(log, "")
+  assert.notEqual(run("1").status, 0)
+  const failedCalls = readFileSync(log, "utf8")
+  assert.doesNotMatch(failedCalls, /node scripts/)
+  assert.match(failedCalls, /hdiutil detach /)
+})
+
+test("all four verified packages produce checksums and a source-bound manifest", (t) => {
   const f = fixture(t)
-  for (const command of ["lipo", "codesign", "spctl", "xcrun"]) {
-    assert.notEqual(f.run("verify-macos-release.sh", [f.bundle, f.checksum], { TEST_FAIL: command }).status, 0)
-    assert.equal(existsSync(f.checksum), false)
+  assert.equal(verify(f.input, f.output, version, commit).length, 4)
+  const manifest = JSON.parse(readFileSync(join(f.output, "release-manifest.json"), "utf8"))
+  assert.equal(manifest.commit, commit)
+  assert.equal(manifest.version, version)
+  assert.equal(manifest.artifacts.length, 4)
+  const sums = readFileSync(join(f.output, "SHA256SUMS"), "utf8").trim().split("\n")
+  assert.equal(sums.length, 4)
+  for (const record of manifest.artifacts) {
+    assert.deepEqual(digest(join(f.output, record.name)), { size: record.size, sha256: record.sha256 })
+    assert.ok(sums.includes(`${record.sha256}  ${record.name}`))
+  }
+  assert.throws(() => verify(f.input, f.output, version, commit), /empty/)
+})
+
+test("verification fails closed before output on incomplete, tampered or unexpected artifacts", (t) => {
+  const mutations = [
+    (f, pkg) => rmSync(pkg),
+    (f, pkg) => writeFileSync(pkg, "tampered"),
+    (f, pkg) => copyFileSync(pkg, join(f.input, "extra.deb")),
+    (f, pkg) => { rmSync(pkg); symlinkSync(join(f.input, "missing"), pkg) },
+    (f, _pkg, manifest) => { manifest.commit = "b".repeat(40) },
+    (f, _pkg, manifest) => { manifest.name = "../../outside.dmg" },
+    (f, _pkg, manifest) => { manifest.id = "linux-amd64" },
+    (f, _pkg, manifest) => { manifest.version = "9.0.0" },
+    (f, _pkg, manifest) => { manifest.target = "x86_64-apple-darwin" },
+  ]
+  for (const mutate of mutations) {
+    const f = fixture(t)
+    const target = targets[0]
+    const manifestPath = join(f.input, target.id, "manifest.json")
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
+    mutate(f, join(f.input, target.id, manifest.name), manifest)
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+    assert.throws(() => verify(f.input, f.output, version, commit))
+    assert.equal(existsSync(f.output), false)
   }
 })
 
-test("publisher binds checksum to exact DMG and only creates a draft", { skip: process.platform !== "darwin" }, (t) => {
-  const f = fixture(t)
-  assert.equal(f.run("verify-macos-release.sh", [f.bundle, f.checksum]).status, 0)
-  assert.equal(f.run("publish-release.sh", [f.bundle, f.checksum]).status, 0)
-  assert.match(readFileSync(f.log, "utf8"), /gh release create .*--draft .*--verify-tag/)
-  rmSync(f.log)
-  writeFileSync(f.dmg, "tampered")
-  assert.notEqual(f.run("publish-release.sh", [f.bundle, f.checksum]).status, 0)
-  assert.equal(existsSync(f.log), false)
-})
-
-test("release source rejects lightweight tags and commits outside main", (t) => {
-  const f = fixture(t)
-  assert.equal(f.run("check-release-source.sh").status, 0)
-  assert.notEqual(f.run("check-release-source.sh", [], { TEST_TAG_TYPE: "commit" }).status, 0)
-  assert.notEqual(f.run("check-release-source.sh", [], { TEST_ANCESTOR_EXIT: "1" }).status, 0)
-  assert.notEqual(f.run("check-release-source.sh", [], { TEST_EVENT_COMMIT: "different" }).status, 0)
-  assert.notEqual(f.run("check-release-source.sh", [], { GITHUB_REF_NAME: "v9.0.0" }).status, 0)
-})
-
-test("signing requires every credential before build and never prints their values", (t) => {
-  const f = fixture(t)
-  const names = ["APPLE_CERTIFICATE", "APPLE_CERTIFICATE_PASSWORD", "APPLE_SIGNING_IDENTITY", "APPLE_ID", "APPLE_PASSWORD", "APPLE_TEAM_ID"]
-  const values = Object.fromEntries(names.map((name) => [name, "fixture-secret-value"]))
-  for (const name of names) {
-    const result = f.run("build-signed-release.sh", [], { ...values, [name]: "" })
-    assert.notEqual(result.status, 0)
-    assert.match(result.stderr, new RegExp(name))
-    assert.equal((result.stdout + result.stderr).includes("fixture-secret-value"), false)
-    assert.equal(existsSync(f.log), false)
+test("only numbered dev tags publish directly; stable and RC remain drafts and never latest", () => {
+  const dev = publishArgs("v0.1.0-dev.1", ["package.dmg"], "notes.md")
+  assert.ok(dev.includes("--prerelease"))
+  assert.ok(dev.includes("--latest=false"))
+  assert.ok(dev.includes("--verify-tag"))
+  assert.ok(dev.includes("--draft"))
+  assert.ok(devPublishArgs("v0.1.0-dev.1").includes("--draft=false"))
+  for (const tag of ["v0.1.0", "v0.1.0-rc.1", "v0.1.0-dev.0", "v0.1.0-beta.1"]) {
+    assert.ok(publishArgs(tag, [], "notes.md").includes("--draft"))
+    assert.equal(devPublishArgs(tag), null)
   }
-  assert.equal(f.run("build-signed-release.sh", [], values).status, 0)
-  assert.equal(readFileSync(f.log, "utf8").trim(), "pnpm release:build")
+  for (const tag of ["--latest", "0.1.0", "v0.1.0-dev.01"]) assert.throws(() => publishArgs(tag, [], "notes.md"))
+})
+
+test("remote uploads must be complete and hash-identical before dev publication", () => {
+  const draft = { tag_name: "v0.1.0-dev.1", draft: true, assets: [] }
+  assert.equal(findDraftRelease([draft], draft.tag_name), draft)
+  for (const releases of [[], [draft, draft], [{ ...draft, draft: false }]]) {
+    assert.throws(() => findDraftRelease(releases, draft.tag_name))
+  }
+  const expected = [{ name: "test.dmg", size: 1, sha256: "a".repeat(64) }]
+  const asset = { name: "test.dmg", size: 1, digest: `sha256:${"a".repeat(64)}`, state: "uploaded" }
+  assert.doesNotThrow(() => verifyUploadedAssets([asset], expected))
+  for (const assets of [[], [asset, asset], [{ ...asset, state: "starter" }], [{ ...asset, digest: null }], [{ ...asset, size: 2 }]]) {
+    assert.throws(() => verifyUploadedAssets(assets, expected))
+  }
+})
+
+test("desktop capability enables exactly the three supported operating systems", () => {
+  const capability = JSON.parse(readFileSync(join(root, "src-tauri/capabilities/default.json"), "utf8"))
+  assert.deepEqual(capability.platforms, ["macOS", "windows", "linux"])
+  assert.deepEqual(capability.permissions, ["core:default"])
+})
+
+test("release source rejects lightweight tags, wrong versions and non-main commits", (t) => {
+  const path = directory(t)
+  writeFileSync(join(path, "git"), `#!/usr/bin/env bash
+case "$1" in
+  cat-file) printf '%s\\n' "\${TEST_TAG_TYPE:-tag}" ;;
+  rev-parse) if [[ "$2" == refs/tags/* ]]; then echo commit; else echo "\${TEST_EVENT_COMMIT:-commit}"; fi ;;
+  merge-base) exit "\${TEST_ANCESTOR_EXIT:-0}" ;;
+esac
+`, { mode: 0o755 })
+  const run = (env = {}) => spawnSync("bash", [join(root, "scripts/check-release-source.sh")], {
+    encoding: "utf8", env: { ...process.env, PATH: `${path}:${process.env.PATH}`, GITHUB_REF_NAME: `v${version}`, GITHUB_SHA: "commit", ...env },
+  })
+  assert.equal(run().status, 0)
+  for (const env of [{ TEST_TAG_TYPE: "commit" }, { TEST_EVENT_COMMIT: "other" }, { TEST_ANCESTOR_EXIT: "1" }, { GITHUB_REF_NAME: "v9.0.0" }]) {
+    assert.notEqual(run(env).status, 0)
+  }
 })

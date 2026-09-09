@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/whg517/u-frame/actions/workflows/ci.yml/badge.svg)](https://github.com/whg517/u-frame/actions/workflows/ci.yml)
 
-UFrame 是一个面向 macOS 的本地桌面机柜与物理设备资产管理工具。它用于维护机房、区域、机柜以及服务器和网络设备台账，并在网格画布中展示和调整设备的真实 U 位。
+UFrame 是一个面向 macOS、Windows 和 Linux 的本地桌面机柜与物理设备资产管理工具。它用于维护机房、区域、机柜以及服务器和网络设备台账，并在网格画布中展示和调整设备的真实 U 位。
 
 ## 当前能力
 
@@ -14,7 +14,7 @@ UFrame 是一个面向 macOS 的本地桌面机柜与物理设备资产管理工
 - 在设置中选择系统/浅色/深色外观、五种主题色、简体中文/英语、默认画布缩放、界面密度与字号以及默认启动页面，偏好在本机保存。
 - 数据保存在本机应用数据目录，不依赖远程服务。
 
-Excel 导入导出、完整审计和正式签名发行仍在后续里程碑中。产品不提供数据备份、迁移或恢复功能，业务数据库固定保存在应用数据目录。已实现范围和非目标以 [PRD](docs/PRD.md) 为准。
+Excel 导入导出和完整审计仍在后续里程碑中。产品不提供数据备份、迁移或恢复功能，业务数据库固定保存在应用数据目录。已实现范围和非目标以 [PRD](docs/PRD.md) 为准。
 
 ## 技术基线
 
@@ -27,7 +27,7 @@ Excel 导入导出、完整审计和正式签名发行仍在后续里程碑中�
 
 ## 本地开发
 
-前置条件：macOS、Node.js 与 Rust 工具链。版本由 [.node-version](.node-version)、[rust-toolchain.toml](rust-toolchain.toml) 和 `packageManager` 字段固定。
+前置条件：受支持的桌面系统、[Tauri 系统依赖](https://v2.tauri.app/start/prerequisites/)、Node.js 与 Rust 工具链。版本由 [.node-version](.node-version)、[rust-toolchain.toml](rust-toolchain.toml) 和 `packageManager` 字段固定。
 
 ```bash
 pnpm install --frozen-lockfile
@@ -53,7 +53,8 @@ pnpm tauri build --debug --bundles app
 
 - 开发采用短生命周期分支、独立 worktree 和 squash merge，详见 [贡献指南](CONTRIBUTING.md)。
 - `main` 和 Pull Request 由 [CI 工作流](.github/workflows/ci.yml) 执行与本地一致的 `pnpm gate`。
-- 正式版本通过 annotated SemVer tag 触发 macOS Universal 构建；签名、公证、验收和 Draft Release 发布步骤见 [发布指南](docs/RELEASING.md)。
+- annotated SemVer tag 触发 macOS arm64 DMG、Windows amd64 EXE、Linux amd64/arm64 DEB 构建；dev.N 为 Pre-release，其他版本只创建 Draft，见 [发布指南](docs/RELEASING.md)。
+- 从 [GitHub Releases](https://github.com/whg517/u-frame/releases) 下载对应包并校验 SHA256SUMS。macOS 仅 ad-hoc 签名且未公证，Windows 未进行证书签名；可能出现系统安全提示。Linux 以 Ubuntu 24.04 为构建基线。
 - 安全问题不要提交公开 Issue，请按 [安全策略](SECURITY.md) 私密报告。
 
 ## 文档导航

@@ -14,12 +14,11 @@ test("Rust installer reads canonical pins without changing the user's global def
   const env = { ...process.env, PATH: `${path}:${process.env.PATH}`, TEST_LOG: log }
   const config = readFileSync(join(root, "rust-toolchain.toml"), "utf8")
   const channel = config.match(/^channel = "([^"]+)"$/m)[1]
-  const run = (extra = {}) => spawnSync(process.execPath, [join(root, "scripts/install-rust-toolchain.mjs"), "--universal"], { encoding: "utf8", env: { ...env, ...extra } })
+  const run = (extra = {}) => spawnSync(process.execPath, [join(root, "scripts/install-rust-toolchain.mjs")], { encoding: "utf8", env: { ...env, ...extra } })
   assert.equal(run().status, 0)
   const calls = readFileSync(log, "utf8").trim().split("\n")
   assert.deepEqual(calls, [
     `toolchain install ${channel} --profile minimal --component clippy,rustfmt`,
-    `target add aarch64-apple-darwin x86_64-apple-darwin --toolchain ${channel}`,
   ])
   rmSync(log)
   assert.equal(run({ TEST_RUSTUP_FAILURE: "9" }).status, 9)
